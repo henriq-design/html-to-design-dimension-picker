@@ -45,11 +45,106 @@
       }
     ];
   
-    function injectCapture(targetWindow) {
+    function getCaptureDiagnostics(win, expectedSize) {
+      return {
+        expectedWidth: expectedSize ? expectedSize.width : undefined,
+        expectedHeight: expectedSize ? expectedSize.height : undefined,
+        'window.innerWidth': win.innerWidth,
+        'window.innerHeight': win.innerHeight,
+        'document.documentElement.clientWidth': win.document.documentElement.clientWidth,
+        'document.documentElement.clientHeight': win.document.documentElement.clientHeight,
+        'document.documentElement.scrollWidth': win.document.documentElement.scrollWidth,
+        'document.body.scrollWidth': win.document.body ? win.document.body.scrollWidth : undefined,
+        'window.devicePixelRatio': win.devicePixelRatio
+      };
+    }
+
+    function logCaptureDiagnostics(win, expectedSize, label) {
+      const diagnostics = getCaptureDiagnostics(win, expectedSize);
+
+      win.console.group(`[html.to.design dimension picker] ${label}`);
+      win.console.table(diagnostics);
+      win.console.groupEnd();
+    }
+
+    function resizeViewportTo(win, width, height, onDone) {
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      function tick() {
+        const widthDelta = width - win.innerWidth;
+        const heightDelta = height - win.innerHeight;
+
+        if (
+          (Math.abs(widthDelta) <= 1 && Math.abs(heightDelta) <= 1) ||
+          attempts >= maxAttempts
+        ) {
+          onDone();
+          return;
+        }
+
+        attempts += 1;
+        win.resizeBy(widthDelta, heightDelta);
+        win.setTimeout(tick, 120);
+      }
+
+      tick();
+    }
+
+    function applyCaptureMetricOverrides(win, expectedSize) {
+      if (!expectedSize || win.__h2dMetricOverridesApplied) {
+        return;
+      }
+
+      const doc = win.document;
+      const width = expectedSize.width;
+      const height = expectedSize.height;
+
+      function defineMetric(target, property, value) {
+        if (!target) {
+          return;
+        }
+
+        try {
+          Object.defineProperty(target, property, {
+            configurable: true,
+            get: function () {
+              return value;
+            }
+          });
+        } catch (error) {
+          win.console.warn(
+            `[html.to.design dimension picker] No se pudo fijar ${property}.`,
+            error
+          );
+        }
+      }
+
+      defineMetric(win, 'innerWidth', width);
+      defineMetric(win, 'innerHeight', height);
+
+      defineMetric(doc.documentElement, 'clientWidth', width);
+      defineMetric(doc.documentElement, 'clientHeight', height);
+      defineMetric(doc.documentElement, 'scrollWidth', width);
+      defineMetric(doc.documentElement, 'scrollHeight', height);
+
+      defineMetric(doc.body, 'clientWidth', width);
+      defineMetric(doc.body, 'clientHeight', height);
+      defineMetric(doc.body, 'scrollWidth', width);
+      defineMetric(doc.body, 'scrollHeight', height);
+
+      win.__h2dMetricOverridesApplied = true;
+    }
+
+    function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
   
       function appendCaptureScript() {
+        logCaptureDiagnostics(win, expectedSize, 'Raw capture diagnostics');
+        applyCaptureMetricOverrides(win, expectedSize);
+        logCaptureDiagnostics(win, expectedSize, 'Effective capture diagnostics');
+
         const script = doc.createElement('script');
         script.src = CAPTURE_SCRIPT_URL;
         script.async = true;
@@ -71,6 +166,8 @@
         [
           `width=${width}`,
           `height=${height}`,
+          'left=0',
+          'top=0',
           'resizable=yes',
           'scrollbars=yes',
           'noopener=no'
@@ -97,12 +194,13 @@
           ) {
             window.clearInterval(interval);
   
-            captureWindow.resizeTo(width, height);
             captureWindow.focus();
   
-            captureWindow.setTimeout(function () {
-              injectCapture(captureWindow);
-            }, 500);
+            resizeViewportTo(captureWindow, width, height, function () {
+              captureWindow.setTimeout(function () {
+                injectCapture(captureWindow, { width: width, height: height });
+              }, 500);
+            });
           }
         } catch (error) {
           window.clearInterval(interval);
@@ -360,7 +458,7 @@
           width === window.innerWidth && height === window.innerHeight;
   
         if (shouldCaptureCurrentViewport) {
-          injectCapture(window);
+          injectCapture(window, { width: width, height: height });
           return;
         }
   
