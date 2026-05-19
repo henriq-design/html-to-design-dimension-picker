@@ -251,16 +251,18 @@
             box-sizing: border-box;
             color: #fff;
             background:
-              linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07) 42%, rgba(18, 18, 22, 0.46)),
-              rgba(18, 18, 22, 0.54);
-            border: 1px solid rgba(255, 255, 255, 0.28);
+              linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08) 34%, rgba(255, 255, 255, 0.03) 68%),
+              rgba(255, 255, 255, 0.075);
+            border: 1px solid rgba(255, 255, 255, 0.42);
             border-radius: 22px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.38),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.1),
-              0 24px 70px rgba(0, 0, 0, 0.38);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
+              inset 0 1px 0 rgba(255, 255, 255, 0.68),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+              inset 1px 0 0 rgba(255, 255, 255, 0.18),
+              0 22px 70px rgba(0, 0, 0, 0.22);
+            backdrop-filter: blur(20px) saturate(210%) brightness(1.08);
+            -webkit-backdrop-filter: blur(20px) saturate(210%) brightness(1.08);
+            isolation: isolate;
             overflow: hidden;
           }
 
@@ -270,9 +272,26 @@
             inset: 0;
             pointer-events: none;
             background:
-              radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.2), transparent 32%),
-              linear-gradient(120deg, rgba(255, 255, 255, 0.14), transparent 38%);
-            opacity: 0.8;
+              radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.78), transparent 26%),
+              radial-gradient(circle at 92% 12%, rgba(255, 255, 255, 0.26), transparent 22%),
+              linear-gradient(118deg, rgba(255, 255, 255, 0.42), transparent 28%, rgba(255, 255, 255, 0.08) 48%, transparent 72%);
+            opacity: 0.65;
+            mix-blend-mode: screen;
+            z-index: -1;
+          }
+
+          .panel::after {
+            content: "";
+            position: absolute;
+            inset: 1px;
+            border-radius: 21px;
+            pointer-events: none;
+            background:
+              linear-gradient(90deg, rgba(255, 70, 150, 0.12), transparent 18%, transparent 82%, rgba(85, 180, 255, 0.16)),
+              repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0 1px, transparent 1px 11px);
+            opacity: 0.32;
+            mask-image: linear-gradient(#000, transparent 62%);
+            -webkit-mask-image: linear-gradient(#000, transparent 62%);
           }
   
           .header {
@@ -290,13 +309,15 @@
             font-size: 18px;
             line-height: 24px;
             font-weight: 720;
+            text-shadow: 0 1px 18px rgba(0, 0, 0, 0.38);
           }
   
           p {
             margin: 5px 0 0;
-            color: rgba(255, 255, 255, 0.72);
+            color: rgba(255, 255, 255, 0.82);
             font-size: 13px;
             line-height: 18px;
+            text-shadow: 0 1px 14px rgba(0, 0, 0, 0.32);
           }
   
           button,
@@ -310,10 +331,11 @@
             position: relative;
             display: block;
             margin: 12px 0 6px;
-            color: rgba(255, 255, 255, 0.82);
+            color: rgba(255, 255, 255, 0.9);
             font-size: 12px;
             line-height: 16px;
             font-weight: 650;
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.34);
           }
   
           select,
@@ -324,16 +346,18 @@
             padding: 9px 11px;
             color: #fff;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06)),
-              rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.22);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.06)),
+              rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.36);
             border-radius: 12px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.2),
-              0 1px 0 rgba(0, 0, 0, 0.08);
+              inset 0 1px 0 rgba(255, 255, 255, 0.42),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+              0 1px 0 rgba(0, 0, 0, 0.06);
             outline: none;
-            backdrop-filter: blur(20px) saturate(160%);
-            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.38);
+            backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
+            -webkit-backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
           }
 
           select {
@@ -342,18 +366,19 @@
   
           select:focus,
           input:focus {
-            border-color: rgba(255, 255, 255, 0.58);
+            border-color: rgba(255, 255, 255, 0.76);
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.24),
-              0 0 0 3px rgba(255, 255, 255, 0.16);
+              inset 0 1px 0 rgba(255, 255, 255, 0.52),
+              0 0 0 3px rgba(255, 255, 255, 0.18),
+              0 0 24px rgba(255, 255, 255, 0.16);
           }
 
           select:hover,
           input:hover {
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)),
-              rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.32);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.08)),
+              rgba(255, 255, 255, 0.075);
+            border-color: rgba(255, 255, 255, 0.48);
           }
   
           .grid {
@@ -373,9 +398,11 @@
           .button {
             min-height: 38px;
             padding: 8px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.34);
             border-radius: 14px;
             cursor: pointer;
+            backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
+            -webkit-backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
             transition:
               transform 120ms ease,
               border-color 120ms ease,
@@ -393,28 +420,40 @@
   
           .button-primary {
             flex: 1;
-            color: #101014;
+            color: rgba(15, 17, 22, 0.92);
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.82));
+              linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.42)),
+              rgba(255, 255, 255, 0.28);
             font-weight: 700;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.9),
-              0 10px 28px rgba(0, 0, 0, 0.18);
+              inset 0 1px 0 rgba(255, 255, 255, 0.78),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+              0 10px 28px rgba(0, 0, 0, 0.12);
+          }
+
+          .button-primary:hover {
+            border-color: rgba(255, 255, 255, 0.68);
+            background:
+              linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.5)),
+              rgba(255, 255, 255, 0.34);
           }
   
           .button-secondary {
             color: #fff;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06)),
-              rgba(255, 255, 255, 0.08);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.05)),
+              rgba(255, 255, 255, 0.055);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.34),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.36);
           }
 
           .button-secondary:hover {
-            border-color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.08)),
-              rgba(255, 255, 255, 0.1);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.08)),
+              rgba(255, 255, 255, 0.08);
           }
   
           .button-icon {
@@ -423,12 +462,17 @@
             padding: 0;
             color: #fff;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.06)),
-              rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.16);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05)),
+              rgba(255, 255, 255, 0.055);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 12px;
             cursor: pointer;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+            box-shadow:
+              inset 0 1px 0 rgba(255, 255, 255, 0.34),
+              inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.38);
+            backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
+            -webkit-backdrop-filter: blur(20px) saturate(190%) brightness(1.08);
             transition:
               background 120ms ease,
               border-color 120ms ease;
@@ -436,17 +480,18 @@
 
           .button-icon:hover {
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
-              rgba(255, 255, 255, 0.12);
-            border-color: rgba(255, 255, 255, 0.28);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.08)),
+              rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.5);
           }
   
           .hint {
             position: relative;
             margin-top: 12px;
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.72);
             font-size: 11px;
             line-height: 15px;
+            text-shadow: 0 1px 12px rgba(0, 0, 0, 0.34);
           }
         </style>
   
