@@ -246,22 +246,21 @@
             position: fixed;
             top: 16px;
             right: 16px;
-            width: 328px;
+            width: 336px;
             padding: 18px;
             box-sizing: border-box;
             color: #111827;
             background:
-              linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.4) 38%, rgba(255, 255, 255, 0.24)),
-              rgba(255, 255, 255, 0.38);
-            border: 1px solid rgba(255, 255, 255, 0.72);
-            border-radius: 22px;
+              linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)),
+              rgba(246, 248, 252, 0.62);
+            border: 1px solid rgba(255, 255, 255, 0.78);
+            border-radius: 26px;
             box-shadow:
               inset 0 1px 0 rgba(255, 255, 255, 0.92),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.38),
-              inset 1px 0 0 rgba(255, 255, 255, 0.32),
-              0 24px 72px rgba(15, 23, 42, 0.2);
-            backdrop-filter: blur(20px) saturate(170%) brightness(1.04);
-            -webkit-backdrop-filter: blur(20px) saturate(170%) brightness(1.04);
+              inset 0 -1px 0 rgba(148, 163, 184, 0.18),
+              0 18px 55px rgba(15, 23, 42, 0.18);
+            backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
+            -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
             isolation: isolate;
             overflow: hidden;
           }
@@ -272,11 +271,10 @@
             inset: 0;
             pointer-events: none;
             background:
-              radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.7), transparent 24%),
-              radial-gradient(circle at 92% 12%, rgba(255, 255, 255, 0.24), transparent 20%),
-              linear-gradient(118deg, rgba(255, 255, 255, 0.28), transparent 30%, rgba(255, 255, 255, 0.08) 52%, transparent 74%);
-            opacity: 0.48;
-            mix-blend-mode: screen;
+              linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 28%),
+              radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.5), transparent 24%),
+              radial-gradient(circle at 0% 100%, rgba(125, 211, 252, 0.16), transparent 30%);
+            opacity: 0.7;
             z-index: -1;
           }
 
@@ -284,14 +282,14 @@
             content: "";
             position: absolute;
             inset: 1px;
-            border-radius: 21px;
+            border-radius: 25px;
             pointer-events: none;
             background:
-              linear-gradient(90deg, rgba(255, 70, 150, 0.08), transparent 18%, transparent 82%, rgba(85, 180, 255, 0.1)),
-              repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 12px);
-            opacity: 0.22;
-            mask-image: linear-gradient(#000, transparent 62%);
-            -webkit-mask-image: linear-gradient(#000, transparent 62%);
+              linear-gradient(135deg, rgba(255, 255, 255, 0.72), transparent 22%, transparent 74%, rgba(255, 255, 255, 0.34)),
+              linear-gradient(90deg, rgba(255, 70, 150, 0.05), transparent 24%, transparent 76%, rgba(56, 189, 248, 0.08));
+            opacity: 0.6;
+            mask-image: linear-gradient(#000, transparent 44%, transparent 74%, #000);
+            -webkit-mask-image: linear-gradient(#000, transparent 44%, transparent 74%, #000);
           }
   
           .header {
@@ -300,24 +298,24 @@
             align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
-            margin-bottom: 14px;
+            margin-bottom: 16px;
           }
   
           h2 {
             margin: 0;
-            color: #111827;
-            font-size: 18px;
+            color: #0f172a;
+            font-size: 17px;
             line-height: 24px;
-            font-weight: 720;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.58);
+            font-weight: 700;
+            letter-spacing: 0;
           }
   
           p {
-            margin: 5px 0 0;
-            color: #334155;
+            margin: 3px 0 0;
+            color: #475569;
             font-size: 13px;
             line-height: 18px;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.46);
+            font-weight: 450;
           }
   
           button,
@@ -330,34 +328,31 @@
           label {
             position: relative;
             display: block;
-            margin: 12px 0 6px;
-            color: #1e293b;
+            margin: 10px 0 6px;
+            color: #334155;
             font-size: 12px;
             line-height: 16px;
-            font-weight: 650;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+            font-weight: 600;
           }
   
           select,
           input {
             position: relative;
             width: 100%;
-            min-height: 38px;
-            padding: 9px 11px;
-            color: #111827;
+            min-height: 40px;
+            padding: 9px 12px;
+            color: #0f172a;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.46)),
-              rgba(255, 255, 255, 0.34);
-            border: 1px solid rgba(255, 255, 255, 0.72);
-            border-radius: 12px;
+              linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.54)),
+              rgba(255, 255, 255, 0.46);
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            border-radius: 16px;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.82),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.28),
-              0 1px 2px rgba(15, 23, 42, 0.08);
+              inset 0 1px 0 rgba(255, 255, 255, 0.9),
+              0 1px 2px rgba(15, 23, 42, 0.06);
             outline: none;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
-            -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
           }
 
           select {
@@ -366,45 +361,46 @@
   
           select:focus,
           input:focus {
-            border-color: rgba(59, 130, 246, 0.72);
+            border-color: rgba(0, 122, 255, 0.62);
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.86),
-              0 0 0 3px rgba(59, 130, 246, 0.18),
+              inset 0 1px 0 rgba(255, 255, 255, 0.92),
+              0 0 0 3px rgba(0, 122, 255, 0.14),
               0 10px 26px rgba(15, 23, 42, 0.08);
           }
 
           select:hover,
           input:hover {
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.5)),
-              rgba(255, 255, 255, 0.4);
-            border-color: rgba(255, 255, 255, 0.9);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.58)),
+              rgba(255, 255, 255, 0.54);
+            border-color: rgba(148, 163, 184, 0.34);
           }
   
           .grid {
             position: relative;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 10px;
           }
   
           .actions {
             position: relative;
             display: flex;
-            gap: 8px;
+            gap: 10px;
             margin-top: 18px;
           }
   
           .button {
-            min-height: 38px;
-            padding: 8px 12px;
-            border: 1px solid rgba(255, 255, 255, 0.7);
-            border-radius: 14px;
+            min-height: 40px;
+            padding: 9px 13px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 999px;
             cursor: pointer;
-            backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
-            -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
+            font-weight: 650;
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
             transition:
-              transform 120ms ease,
+              transform 140ms ease,
               border-color 120ms ease,
               background 120ms ease,
               box-shadow 120ms ease;
@@ -420,60 +416,55 @@
   
           .button-primary {
             flex: 1;
-            color: #0f172a;
+            color: #fff;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.7)),
-              rgba(255, 255, 255, 0.58);
-            font-weight: 700;
+              linear-gradient(180deg, rgba(0, 122, 255, 0.92), rgba(0, 95, 220, 0.9)),
+              #006ee6;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.94),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.38),
-              0 10px 28px rgba(15, 23, 42, 0.12);
+              inset 0 1px 0 rgba(255, 255, 255, 0.36),
+              0 10px 24px rgba(0, 122, 255, 0.24);
           }
 
           .button-primary:hover {
-            border-color: rgba(255, 255, 255, 0.96);
+            border-color: rgba(255, 255, 255, 0.42);
             background:
-              linear-gradient(180deg, #fff, rgba(255, 255, 255, 0.78)),
-              rgba(255, 255, 255, 0.64);
+              linear-gradient(180deg, rgba(36, 145, 255, 0.96), rgba(0, 100, 230, 0.92)),
+              #006ee6;
           }
   
           .button-secondary {
-            color: #1e293b;
+            color: #334155;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.38)),
-              rgba(255, 255, 255, 0.28);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)),
+              rgba(255, 255, 255, 0.44);
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.76),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.24),
-              0 8px 20px rgba(15, 23, 42, 0.08);
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.46);
+              inset 0 1px 0 rgba(255, 255, 255, 0.84),
+              0 8px 20px rgba(15, 23, 42, 0.06);
           }
 
           .button-secondary:hover {
-            border-color: rgba(255, 255, 255, 0.92);
+            border-color: rgba(148, 163, 184, 0.32);
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.44)),
-              rgba(255, 255, 255, 0.36);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
+              rgba(255, 255, 255, 0.5);
           }
   
           .button-icon {
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             padding: 0;
-            color: #1e293b;
+            color: #475569;
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.34)),
-              rgba(255, 255, 255, 0.26);
-            border: 1px solid rgba(255, 255, 255, 0.68);
-            border-radius: 12px;
+              linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.42)),
+              rgba(255, 255, 255, 0.36);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 999px;
             cursor: pointer;
             box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.78),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.2);
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.48);
-            backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
-            -webkit-backdrop-filter: blur(20px) saturate(160%) brightness(1.04);
+              inset 0 1px 0 rgba(255, 255, 255, 0.82),
+              0 6px 18px rgba(15, 23, 42, 0.06);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
             transition:
               background 120ms ease,
               border-color 120ms ease;
@@ -481,18 +472,17 @@
 
           .button-icon:hover {
             background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.42)),
-              rgba(255, 255, 255, 0.34);
-            border-color: rgba(255, 255, 255, 0.9);
+              linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.52)),
+              rgba(255, 255, 255, 0.5);
+            border-color: rgba(148, 163, 184, 0.32);
           }
   
           .hint {
             position: relative;
             margin-top: 12px;
-            color: #475569;
+            color: #64748b;
             font-size: 11px;
             line-height: 15px;
-            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42);
           }
         </style>
   
