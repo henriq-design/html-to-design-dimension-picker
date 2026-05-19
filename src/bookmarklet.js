@@ -136,6 +136,153 @@
       win.__h2dMetricOverridesApplied = true;
     }
 
+    function installCaptureToolbarStyles(win) {
+      const doc = win.document;
+
+      if (!doc || !doc.head || win.__h2dCaptureToolbarStylesInstalled) {
+        return;
+      }
+
+      const style = doc.createElement('style');
+      style.id = 'h2d-capture-toolbar-style';
+      style.textContent = `
+        .h2d-capture-toolbar {
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)),
+            rgba(246, 248, 252, 0.62) !important;
+          border: 1px solid rgba(255, 255, 255, 0.78) !important;
+          border-radius: 26px !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.92),
+            inset 0 -1px 0 rgba(148, 163, 184, 0.18),
+            0 18px 55px rgba(15, 23, 42, 0.18) !important;
+          color: #0f172a !important;
+          overflow: hidden !important;
+          backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
+          -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
+        }
+
+        .h2d-capture-toolbar::before {
+          content: "" !important;
+          position: absolute !important;
+          inset: 0 !important;
+          pointer-events: none !important;
+          background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 28%),
+            radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.5), transparent 24%),
+            radial-gradient(circle at 0% 100%, rgba(125, 211, 252, 0.16), transparent 30%) !important;
+          opacity: 0.7 !important;
+        }
+
+        .h2d-capture-toolbar,
+        .h2d-capture-toolbar * {
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif !important;
+          letter-spacing: 0 !important;
+        }
+
+        .h2d-capture-toolbar button,
+        .h2d-capture-toolbar [role="button"] {
+          color: #334155 !important;
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)),
+            rgba(255, 255, 255, 0.44) !important;
+          border: 1px solid rgba(148, 163, 184, 0.22) !important;
+          border-radius: 999px !important;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.84),
+            0 8px 20px rgba(15, 23, 42, 0.06) !important;
+          font-weight: 650 !important;
+          backdrop-filter: blur(18px) saturate(160%) !important;
+          -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+        }
+
+        .h2d-capture-toolbar button:hover,
+        .h2d-capture-toolbar [role="button"]:hover {
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
+            rgba(255, 255, 255, 0.5) !important;
+          border-color: rgba(148, 163, 184, 0.32) !important;
+        }
+
+        .h2d-capture-toolbar svg,
+        .h2d-capture-toolbar path {
+          color: #475569 !important;
+          stroke: currentColor !important;
+        }
+      `;
+      doc.head.appendChild(style);
+
+      function getDeepElements(root) {
+        const elements = [];
+        const tree = root.querySelectorAll ? root.querySelectorAll('*') : [];
+
+        tree.forEach(function (element) {
+          elements.push(element);
+
+          if (element.shadowRoot) {
+            getDeepElements(element.shadowRoot).forEach(function (shadowElement) {
+              elements.push(shadowElement);
+            });
+          }
+        });
+
+        return elements;
+      }
+
+      function findToolbarRoot() {
+        return getDeepElements(doc).find(function (element) {
+          const text = element.textContent || '';
+          const rect = element.getBoundingClientRect();
+
+          return (
+            text.includes('Copy to clipboard') &&
+            text.includes('Entire screen') &&
+            text.includes('Select element') &&
+            rect.width > 320 &&
+            rect.height > 36 &&
+            rect.height < 120
+          );
+        });
+      }
+
+      function applyToolbarClass() {
+        const toolbar = findToolbarRoot();
+
+        if (toolbar) {
+          toolbar.classList.add('h2d-capture-toolbar');
+        }
+      }
+
+      let attempts = 0;
+      const interval = win.setInterval(function () {
+        attempts += 1;
+        applyToolbarClass();
+
+        if (attempts >= 80) {
+          win.clearInterval(interval);
+        }
+      }, 100);
+
+      if (win.MutationObserver && doc.body) {
+        const observer = new win.MutationObserver(applyToolbarClass);
+        observer.observe(doc.body, { childList: true, subtree: true });
+
+        win.setTimeout(function () {
+          observer.disconnect();
+        }, 10000);
+      }
+
+      applyToolbarClass();
+      win.__h2dCaptureToolbarStylesInstalled = true;
+    }
+
     function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
@@ -144,6 +291,7 @@
         logCaptureDiagnostics(win, expectedSize, 'Raw capture diagnostics');
         applyCaptureMetricOverrides(win, expectedSize);
         logCaptureDiagnostics(win, expectedSize, 'Effective capture diagnostics');
+        installCaptureToolbarStyles(win);
 
         const script = doc.createElement('script');
         script.src = CAPTURE_SCRIPT_URL;
