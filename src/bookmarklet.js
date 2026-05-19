@@ -7,41 +7,41 @@
       return;
     }
   
+    const currentViewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+  
     const presets = [
       {
         id: 'current',
-        label: `Viewport actual · ${window.innerWidth} × ${window.innerHeight}`,
-        width: window.innerWidth,
-        height: window.innerHeight,
-        mode: 'current'
+        label: `Viewport actual · ${currentViewport.width} × ${currentViewport.height}`,
+        width: currentViewport.width,
+        height: currentViewport.height
       },
       {
         id: 'desktop',
         label: 'Desktop · 1440 × 900',
         width: 1440,
-        height: 900,
-        mode: 'popup'
+        height: 900
       },
       {
         id: 'laptop',
         label: 'Laptop · 1366 × 768',
         width: 1366,
-        height: 768,
-        mode: 'popup'
+        height: 768
       },
       {
         id: 'tablet',
         label: 'Tablet · 768 × 1024',
         width: 768,
-        height: 1024,
-        mode: 'popup'
+        height: 1024
       },
       {
         id: 'mobile',
         label: 'Mobile · 390 × 844',
         width: 390,
-        height: 844,
-        mode: 'popup'
+        height: 844
       }
     ];
   
@@ -281,11 +281,9 @@
           <label for="preset">Preset</label>
           <select id="preset">
             ${presets
-              .map(
-                function (preset, index) {
-                  return `<option value="${index}">${preset.label}</option>`;
-                }
-              )
+              .map(function (preset, index) {
+                return `<option value="${index}">${preset.label}</option>`;
+              })
               .join('')}
           </select>
   
@@ -312,7 +310,7 @@
           </div>
   
           <div class="hint">
-            Las dimensiones custom abren una ventana nueva. El viewport actual captura esta pestaña directamente.
+            Si el tamaño coincide con el viewport actual, captura esta pestaña. Si cambia, abre una ventana nueva con esas dimensiones.
           </div>
         </section>
       `;
@@ -340,7 +338,6 @@
       function handleCapture() {
         const width = Number(widthInput.value);
         const height = Number(heightInput.value);
-        const selectedPreset = presets[Number(presetSelect.value)];
   
         if (!Number.isFinite(width) || !Number.isFinite(height)) {
           window.alert('Introduce dimensiones numéricas válidas.');
@@ -359,7 +356,10 @@
   
         closePanel();
   
-        if (selectedPreset.mode === 'current') {
+        const shouldCaptureCurrentViewport =
+          width === window.innerWidth && height === window.innerHeight;
+  
+        if (shouldCaptureCurrentViewport) {
           injectCapture(window);
           return;
         }
