@@ -367,8 +367,8 @@
         <section class="panel" role="dialog" aria-labelledby="h2d-title">
           <div class="header">
             <div>
-              <h2 id="h2d-title">Capturar con dimensiones</h2>
-              <p>Define el tamaño antes de enviar la página a html.to.design.</p>
+              <h2 id="h2d-title">Capturar viewport</h2>
+              <p>Elige el tamaño que se enviará a html.to.design.</p>
             </div>
   
             <button class="button-icon" type="button" data-action="close" aria-label="Cerrar">
@@ -408,7 +408,7 @@
           </div>
   
           <div class="hint">
-            Si el tamaño coincide con el viewport actual, captura esta pestaña. Si cambia, abre una ventana nueva con esas dimensiones.
+            Si eliges otro tamaño, se abrirá una ventana de captura con ese viewport.
           </div>
         </section>
       `;

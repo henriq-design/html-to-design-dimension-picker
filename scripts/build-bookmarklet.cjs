@@ -7,14 +7,9 @@ const markerPath = path.join(__dirname, '..', 'marcador-codigoJS');
 
 const source = fs.readFileSync(sourcePath, 'utf8');
 
-const withoutComments = source
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/^\s*\/\/.*$/gm, '');
-
-const compact = withoutComments
-  .replace(/\s+/g, ' ')
-  .replace(/\s*([{}()[\];,:=+\-*/<>])\s*/g, '$1')
-  .trim();
+// Keep the source text intact. Regex minification can corrupt strings,
+// template literals, inline CSS, and visible modal copy.
+const compact = source.trim();
 
 const bookmarklet = `javascript:${encodeURIComponent(compact)}`;
 
