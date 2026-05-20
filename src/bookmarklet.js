@@ -268,11 +268,16 @@
 
         controls.forEach(function (control) {
           const text = control.textContent || '';
+          const isCaptureControl =
+            text.includes('Copy to clipboard') ||
+            text.includes('Copiar al portapapeles') ||
+            text.includes('Entire screen') ||
+            text.includes('Pantalla completa') ||
+            text.includes('Select element') ||
+            text.includes('Seleccionar elemento');
 
           if (
-            !text.includes('Copy to clipboard') &&
-            !text.includes('Entire screen') &&
-            !text.includes('Select element') &&
+            !isCaptureControl &&
             control.tagName !== 'BUTTON' &&
             control.getAttribute('role') !== 'button'
           ) {
@@ -316,8 +321,12 @@
           const text = element.textContent || '';
           const rect = element.getBoundingClientRect();
           const hasToolbarCopy =
-            text.includes('Copy to clipboard') &&
-            (text.includes('Entire screen') || text.includes('Select element'));
+            (text.includes('Copy to clipboard') ||
+              text.includes('Copiar al portapapeles')) &&
+            (text.includes('Entire screen') ||
+              text.includes('Pantalla completa') ||
+              text.includes('Select element') ||
+              text.includes('Seleccionar elemento'));
 
           return (
             hasToolbarCopy &&
