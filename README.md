@@ -1,47 +1,112 @@
-# html.to.design — marcador (bookmarklet)
+# html.to.design — dimension picker bookmarklet
 
-Repo para **explicar y compartir** un flujo práctico: llevar una web a **Figma en capas** usando el mismo mecanismo que **html-to-design** (ventana de importación / captura), **sin pasar por la IA ni gastar tokens del MCP**.
+Bookmarklet para capturar una web con **html.to.design** eligiendo antes el tamaño del viewport que quieres enviar a **Figma**.
 
-## Idea en una frase
+El objetivo es poder traer una página como referencia en capas, desde el navegador, sin pedirle a un agente de IA que ejecute todo el flujo MCP ni gastar tokens en una captura que puedes lanzar manualmente.
 
-Reutilizas la lógica de la importación que antes mucha gente asociaba a flujos tipo **Cloud Code → Figma**: cargar `capture.js`, fijar el hash de captura y dejar que el servicio convierta la página en capas. Eso se puede hacer **desde el navegador** con un **bookmarklet** (un marcador que ejecuta JavaScript en la pestaña actual): **gratis** para pruebas rápidas o para traer **referencias** (tuyas o ajenas), sabiendo que el resultado no es perfecto (CSP, iframes, sitios muy dinámicos, etc.).
+## Qué hace
 
-## Qué hay en el repo
+Al ejecutar el marcador en una página, aparece un panel flotante con:
 
-| Elemento | Para qué sirve |
-|----------|----------------|
-| **`marcador-codigoJS`** | Código **minificado en una línea** listo para pegar como URL de un marcador (`javascript:…`). Carga `capture.js` de Figma, espera 500 ms, pone el hash de prueba `figmacapture&figmadelay=1000` y vuelve a cargar el script (patrón recomendado para localhost / pruebas). |
-| **`.cursor/skills/figma-html-to-design-script-only/SKILL.md`** | Skill: por defecto solo preparar la página (script), sin disparar `generate_figma_design` ni poll — **ahorra tokens** con el MCP cuando no quieres captura automática. |
-| **`.cursor/rules/figma-html-to-design-capture.mdc`** | Regla de proyecto + **tabla** de dónde replicar la misma idea en **Claude Code**, **Codex CLI** y **Copilot CLI** (con enlaces a su documentación). |
+- Presets de viewport: actual, desktop, laptop, tablet y mobile.
+- Campos manuales para ancho y alto.
+- Validación básica de dimensiones.
+- Apertura de una ventana de captura cuando el tamaño elegido no coincide con el viewport actual.
+- Ajustes de métricas del documento antes de cargar `capture.js`, para que html.to.design lea el tamaño elegido y no el ancho real del layout.
+- Logs de diagnóstico en consola para revisar qué tamaño ve el navegador antes de la captura.
+- Estilo visual tipo **SwiftUI Liquid Glass** para el selector y para la toolbar secundaria de html.to.design.
 
-**La carpeta `.cursor/` va incluida a propósito** en el repositorio para que quien clone el proyecto pueda usarla tal cual o copiarla a otros repos locales.
+## Archivos principales
 
-Aunque la skill y la regla se **redactaron y enlazan desde Cursor** (rutas `.cursor/`), el **criterio es compatible** con otros asistentes por terminal o IDE: **Claude Code**, **Codex**, **Copilot CLI**, etc. Cada herramienta usa su propio fichero o carpeta de instrucciones; la regla del repo resume **dónde pegar** el equivalente. No hace falta usar Cursor para aprovechar el mismo comportamiento.
+| Archivo | Para qué sirve |
+| --- | --- |
+| `src/bookmarklet.js` | Código fuente legible del bookmarklet. Aquí están la lógica del selector, la captura y los estilos. |
+| `scripts/build-bookmarklet.cjs` | Genera el bookmarklet listo para pegar en el navegador. Preserva strings, HTML y CSS para no romper los textos del modal. |
+| `marcador-codigoJS` | Código final para pegar como URL de un marcador. |
+| `dist/bookmarklet.min.js` | Mismo output generado, dentro de `dist/`. |
+| `original/marcador-codigoJS` | Versión original simple, conservada como referencia. |
+| `docs/decision-log.md` | Notas de decisiones del proyecto. |
+| `.cursor/skills/` y `.cursor/rules/` | Instrucciones auxiliares para asistentes/IDE que trabajan con el flujo de Figma/html.to.design. |
 
-## Código del bookmarklet
+## Uso rápido
 
-**Una línea** para pegar en la URL del marcador (mismo contenido que `marcador-codigoJS`): inyecta `capture.js`, a los 500 ms asigna el hash `figmacapture&figmadelay=1000` y vuelve a cargar el script.
+La forma más cómoda para probar la última versión publicada en este repo es crear un marcador con este loader:
 
 ```javascript
-javascript:(function(){var s=document.createElement('script');s.src='https://mcp.figma.com/mcp/html-to-design/capture.js';document.head.appendChild(s);setTimeout(function(){window.location.hash='figmacapture&figmadelay=1000';var s2=document.createElement('script');s2.src='https://mcp.figma.com/mcp/html-to-design/capture.js';document.head.appendChild(s2);},500);})();
+javascript:(()=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/henriq-design/html-to-design-dimension-picker@main/src/bookmarklet.js';document.head.appendChild(s)})()
 ```
 
-## Cómo crear el marcador en el navegador
+Si una página bloquea scripts externos por CSP, usa la versión autocontenida de `marcador-codigoJS`.
 
-1. Copia **toda la línea** del bloque anterior.
-2. Crea un marcador nuevo y en **URL** pega ese contenido (en Chrome: “Añadir marcador” → pegar en URL).
-3. Entra en la página que quieras capturar (debe cargarse con **`http://` o `https://`**; `file://` no vale).
-4. Pulsa el marcador. Sigue las indicaciones de la UI de captura de Figma (iniciar sesión si hace falta, elegir archivo destino, etc.).
+## Cómo crear el marcador
 
-Si Figma / el flujo MCP te da un hash concreto (`#figmacapture=<id>&figmaendpoint=…`), en esa misma línea cambia el literal `'figmacapture&figmadelay=1000'` por **exactamente** el fragmento que te indiquen (sin el `#` inicial). No inventes `captureId` ni endpoints.
+1. Crea un marcador nuevo en el navegador.
+2. En el campo **URL**, pega el loader anterior o el contenido completo de `marcador-codigoJS`.
+3. Entra en la página que quieres capturar.
+4. Pulsa el marcador.
+5. Elige el preset o introduce ancho/alto manualmente.
+6. Pulsa **Capturar**.
+7. Sigue la toolbar de html.to.design para copiar o enviar la captura a Figma.
+
+## Flujo de captura
+
+Si eliges el viewport actual, el bookmarklet lanza la captura en la pestaña activa.
+
+Si eliges otro tamaño, abre una ventana nueva con esas dimensiones y espera a que cargue. Antes de inyectar `capture.js`, el bookmarklet:
+
+- Ajusta el viewport real con `resizeBy`.
+- Registra métricas como `window.innerWidth`, `document.documentElement.clientWidth`, `document.documentElement.scrollWidth` y `window.devicePixelRatio`.
+- Sobrescribe métricas clave (`innerWidth`, `clientWidth`, `scrollWidth`, etc.) para que `capture.js` use el tamaño elegido.
+- Carga `https://mcp.figma.com/mcp/html-to-design/capture.js`.
+- Aplica estilos glass a la toolbar secundaria que crea html.to.design cuando aparece.
+
+## Desarrollo
+
+Edita el archivo fuente:
+
+```bash
+src/bookmarklet.js
+```
+
+Después genera los outputs:
+
+```bash
+node scripts/build-bookmarklet.cjs
+```
+
+El script actualiza:
+
+```text
+marcador-codigoJS
+dist/bookmarklet.min.js
+```
+
+## Estilo visual
+
+El selector usa una interpretación web de **SwiftUI Liquid Glass**:
+
+- Material translúcido con `backdrop-filter`.
+- Fondo lechoso para mantener contraste.
+- Bordes ópticos suaves.
+- Botones tipo cápsula.
+- Acción principal con azul sistema accesible.
+- Tipografía sobria y compacta.
+
+También se intenta aplicar el mismo lenguaje visual a la toolbar que monta `capture.js` (`Copy to clipboard`, `Entire screen`, `Select element`). Esta parte depende de que esa toolbar exista en el DOM accesible de la página.
+
+## Limitaciones conocidas
+
+- Algunas páginas pueden bloquear scripts externos con CSP.
+- Sitios con iframes, login, canvas o contenido muy dinámico pueden no capturarse bien.
+- El ajuste de dimensiones depende de APIs del navegador como `window.open`, `resizeBy` y acceso al documento de la ventana nueva.
+- Si html.to.design cambia los textos o estructura de su toolbar, el override visual de esa toolbar puede dejar de aplicarse.
+- Este repo no es un producto oficial de Figma ni de html.to.design; solo documenta y comparte un flujo práctico.
 
 ## Tokens: bookmarklet vs MCP
 
-- **Con el MCP** (`generate_figma_design`, etc.) el asistente recibe **instrucciones largas** y suele hacer **varias llamadas** (poll): eso **consume tokens** en el chat.
-- **Con el bookmarklet** tú disparas la captura **solo en el navegador**; **no** necesitas que la IA ejecute ese flujo para “meter la web en Figma”. Ideal para **referencias** y **iteraciones rápidas** sin pagar ese coste en el modelo.
-
-La skill y la regla ayudan cuando **sí** usas un asistente con el MCP de Figma: que el agente **no** lance captura MCP por defecto y solo **inyecte** script cuando eso es lo que quieres (misma idea en Cursor, Claude Code, Codex, Copilot, etc., según cómo importes las instrucciones).
+- Con el MCP (`generate_figma_design`, etc.), el asistente recibe instrucciones largas y suele hacer varias llamadas de polling, lo que consume tokens en el chat.
+- Con este bookmarklet, tú disparas la captura en el navegador. Es útil para referencias e iteraciones rápidas sin pedirle al modelo que ejecute el flujo completo.
 
 ## Aviso
 
-Este flujo depende del **servicio html-to-design de Figma** y de tu **cuenta / permisos**. No es un producto oficial de este repo; aquí solo se documenta el truco y se comparten archivos de ejemplo.
+El flujo depende del servicio html.to.design de Figma y de tu cuenta/permisos. Úsalo para páginas que tengas permiso de capturar o para referencias propias.
