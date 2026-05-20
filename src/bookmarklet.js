@@ -139,14 +139,13 @@
     function installCaptureToolbarStyles(win) {
       const doc = win.document;
 
-      if (!doc || !doc.head || win.__h2dCaptureToolbarStylesInstalled) {
+      if (!doc || !doc.head) {
         return;
       }
 
-      const style = doc.createElement('style');
-      style.id = 'h2d-capture-toolbar-style';
-      style.textContent = `
+      const toolbarCss = `
         .h2d-capture-toolbar {
+          position: relative !important;
           background:
             linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)),
             rgba(246, 248, 252, 0.62) !important;
@@ -216,8 +215,83 @@
           color: #475569 !important;
           stroke: currentColor !important;
         }
+
+        .h2d-capture-toolbar [style*="background"] {
+          background: transparent !important;
+        }
       `;
-      doc.head.appendChild(style);
+
+      function injectStyle(root) {
+        const target = root.head || root;
+
+        if (!target || target.querySelector('#h2d-capture-toolbar-style')) {
+          return;
+        }
+
+        const style = doc.createElement('style');
+        style.id = 'h2d-capture-toolbar-style';
+        style.textContent = toolbarCss;
+        target.appendChild(style);
+      }
+
+      injectStyle(doc);
+
+      function setImportant(element, property, value) {
+        if (element && element.style) {
+          element.style.setProperty(property, value, 'important');
+        }
+      }
+
+      function applyRootInlineStyles(toolbar) {
+        setImportant(
+          toolbar,
+          'background',
+          'linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)), rgba(246, 248, 252, 0.62)'
+        );
+        setImportant(toolbar, 'border', '1px solid rgba(255, 255, 255, 0.78)');
+        setImportant(toolbar, 'border-radius', '26px');
+        setImportant(
+          toolbar,
+          'box-shadow',
+          'inset 0 1px 0 rgba(255, 255, 255, 0.92), inset 0 -1px 0 rgba(148, 163, 184, 0.18), 0 18px 55px rgba(15, 23, 42, 0.18)'
+        );
+        setImportant(toolbar, 'color', '#0f172a');
+        setImportant(toolbar, 'overflow', 'hidden');
+        setImportant(toolbar, 'backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
+        setImportant(toolbar, '-webkit-backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
+      }
+
+      function applyControlInlineStyles(toolbar) {
+        const controls = toolbar.querySelectorAll
+          ? toolbar.querySelectorAll('button, [role="button"], a, div')
+          : [];
+
+        controls.forEach(function (control) {
+          const text = control.textContent || '';
+
+          if (
+            !text.includes('Copy to clipboard') &&
+            !text.includes('Entire screen') &&
+            !text.includes('Select element') &&
+            control.tagName !== 'BUTTON' &&
+            control.getAttribute('role') !== 'button'
+          ) {
+            return;
+          }
+
+          setImportant(control, 'color', '#334155');
+          setImportant(
+            control,
+            'background',
+            'linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)), rgba(255, 255, 255, 0.44)'
+          );
+          setImportant(control, 'border', '1px solid rgba(148, 163, 184, 0.22)');
+          setImportant(control, 'border-radius', '999px');
+          setImportant(control, 'font-weight', '650');
+          setImportant(control, 'backdrop-filter', 'blur(18px) saturate(160%)');
+          setImportant(control, '-webkit-backdrop-filter', 'blur(18px) saturate(160%)');
+        });
+      }
 
       function getDeepElements(root) {
         const elements = [];
@@ -227,6 +301,7 @@
           elements.push(element);
 
           if (element.shadowRoot) {
+            injectStyle(element.shadowRoot);
             getDeepElements(element.shadowRoot).forEach(function (shadowElement) {
               elements.push(shadowElement);
             });
@@ -237,19 +312,26 @@
       }
 
       function findToolbarRoot() {
-        return getDeepElements(doc).find(function (element) {
+        const matches = getDeepElements(doc).filter(function (element) {
           const text = element.textContent || '';
           const rect = element.getBoundingClientRect();
+          const hasToolbarCopy =
+            text.includes('Copy to clipboard') &&
+            (text.includes('Entire screen') || text.includes('Select element'));
 
           return (
-            text.includes('Copy to clipboard') &&
-            text.includes('Entire screen') &&
-            text.includes('Select element') &&
+            hasToolbarCopy &&
             rect.width > 320 &&
             rect.height > 36 &&
-            rect.height < 120
+            rect.height < 160
           );
         });
+
+        return matches.sort(function (a, b) {
+          return (
+            a.getBoundingClientRect().height - b.getBoundingClientRect().height
+          );
+        })[0];
       }
 
       function applyToolbarClass() {
@@ -257,6 +339,9 @@
 
         if (toolbar) {
           toolbar.classList.add('h2d-capture-toolbar');
+          applyRootInlineStyles(toolbar);
+          applyControlInlineStyles(toolbar);
+          win.console.info('[html.to.design dimension picker] Toolbar glass styles applied.');
         }
       }
 
