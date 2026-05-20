@@ -243,13 +243,14 @@
       }
 
       function applyRootInlineStyles(toolbar) {
+        setImportant(toolbar, 'isolation', 'isolate');
         setImportant(
           toolbar,
           'background',
-          'linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)), rgba(246, 248, 252, 0.62)'
+          'linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(246, 248, 252, 0.66)), rgba(246, 248, 252, 0.6)'
         );
         setImportant(toolbar, 'border', '1px solid rgba(255, 255, 255, 0.78)');
-        setImportant(toolbar, 'border-radius', '26px');
+        setImportant(toolbar, 'border-radius', '22px');
         setImportant(
           toolbar,
           'box-shadow',
@@ -259,6 +260,19 @@
         setImportant(toolbar, 'overflow', 'hidden');
         setImportant(toolbar, 'backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
         setImportant(toolbar, '-webkit-backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
+      }
+
+      function clearCompetingInlineStyles(toolbar) {
+        const elements = toolbar.querySelectorAll ? toolbar.querySelectorAll('*') : [];
+
+        elements.forEach(function (element) {
+          setImportant(element, 'box-shadow', 'none');
+          setImportant(element, 'border-color', 'rgba(148, 163, 184, 0.16)');
+
+          if (element !== toolbar) {
+            setImportant(element, 'background-color', 'transparent');
+          }
+        });
       }
 
       function applyControlInlineStyles(toolbar) {
@@ -295,6 +309,13 @@
           setImportant(control, 'font-weight', '650');
           setImportant(control, 'backdrop-filter', 'blur(18px) saturate(160%)');
           setImportant(control, '-webkit-backdrop-filter', 'blur(18px) saturate(160%)');
+
+          const descendants = control.querySelectorAll ? control.querySelectorAll('*') : [];
+          descendants.forEach(function (descendant) {
+            setImportant(descendant, 'color', '#334155');
+            setImportant(descendant, 'background-color', 'transparent');
+            setImportant(descendant, 'stroke', 'currentColor');
+          });
         });
       }
 
@@ -311,9 +332,48 @@
               elements.push(shadowElement);
             });
           }
+
+          if (element.tagName === 'IFRAME') {
+            try {
+              const iframeDoc = element.contentDocument;
+
+              if (iframeDoc) {
+                injectStyle(iframeDoc);
+                getDeepElements(iframeDoc).forEach(function (iframeElement) {
+                  elements.push(iframeElement);
+                });
+              }
+            } catch (error) {
+              // Cross-origin iframes are intentionally ignored.
+            }
+          }
         });
 
         return elements;
+      }
+
+      function getVisualToolbarContainer(element) {
+        let toolbar = element;
+        let parent = element.parentElement;
+
+        while (parent && parent !== doc.body && parent !== doc.documentElement) {
+          const rect = parent.getBoundingClientRect();
+          const style = win.getComputedStyle(parent);
+          const isToolbarSized = rect.width > 320 && rect.height >= 36 && rect.height < 120;
+          const isOverlay =
+            style.position === 'fixed' ||
+            style.position === 'sticky' ||
+            Number(style.zIndex) > 100;
+
+          if (!isToolbarSized || !isOverlay) {
+            break;
+          }
+
+          toolbar = parent;
+          parent = parent.parentElement;
+        }
+
+        return toolbar;
       }
 
       function findToolbarRoot() {
@@ -340,7 +400,7 @@
           return (
             a.getBoundingClientRect().height - b.getBoundingClientRect().height
           );
-        })[0];
+        }).map(getVisualToolbarContainer)[0];
       }
 
       function applyToolbarClass() {
@@ -349,6 +409,7 @@
         if (toolbar) {
           toolbar.classList.add('h2d-capture-toolbar');
           applyRootInlineStyles(toolbar);
+          clearCompetingInlineStyles(toolbar);
           applyControlInlineStyles(toolbar);
           win.console.info('[html.to.design dimension picker] Toolbar glass styles applied.');
         }
@@ -377,11 +438,32 @@
       win.__h2dCaptureToolbarStylesInstalled = true;
     }
 
+    function exposeCaptureShadowRoots(win) {
+      if (win.__h2dShadowRootsExposed || !win.Element || !win.Element.prototype) {
+        return;
+      }
+
+      const originalAttachShadow = win.Element.prototype.attachShadow;
+
+      if (!originalAttachShadow) {
+        return;
+      }
+
+      win.Element.prototype.attachShadow = function (init) {
+        const options = Object.assign({}, init, { mode: 'open' });
+
+        return originalAttachShadow.call(this, options);
+      };
+
+      win.__h2dShadowRootsExposed = true;
+    }
+
     function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
   
       function appendCaptureScript() {
+        exposeCaptureShadowRoots(win);
         logCaptureDiagnostics(win, expectedSize, 'Raw capture diagnostics');
         applyCaptureMetricOverrides(win, expectedSize);
         logCaptureDiagnostics(win, expectedSize, 'Effective capture diagnostics');
