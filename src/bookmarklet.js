@@ -242,6 +242,28 @@
         }
       }
 
+      function isCaptureLabel(text) {
+        return (
+          text.includes('Copy to clipboard') ||
+          text.includes('Copiar al portapapeles') ||
+          text.includes('Entire screen') ||
+          text.includes('Pantalla completa') ||
+          text.includes('Select element') ||
+          text.includes('Seleccionar elemento')
+        );
+      }
+
+      function isToolbarRect(rect) {
+        const maxToolbarWidth = Math.min(1120, win.innerWidth - 80);
+
+        return (
+          rect.width > 320 &&
+          rect.width <= maxToolbarWidth &&
+          rect.height > 36 &&
+          rect.height < 160
+        );
+      }
+
       function applyRootInlineStyles(toolbar) {
         setImportant(toolbar, 'isolation', 'isolate');
         setImportant(
@@ -277,18 +299,12 @@
 
       function applyControlInlineStyles(toolbar) {
         const controls = toolbar.querySelectorAll
-          ? toolbar.querySelectorAll('button, [role="button"], a, div')
+          ? toolbar.querySelectorAll('button, [role="button"], a')
           : [];
 
         controls.forEach(function (control) {
           const text = control.textContent || '';
-          const isCaptureControl =
-            text.includes('Copy to clipboard') ||
-            text.includes('Copiar al portapapeles') ||
-            text.includes('Entire screen') ||
-            text.includes('Pantalla completa') ||
-            text.includes('Select element') ||
-            text.includes('Seleccionar elemento');
+          const isCaptureControl = isCaptureLabel(text);
 
           if (
             !isCaptureControl &&
@@ -307,6 +323,7 @@
           setImportant(control, 'border', '1px solid rgba(148, 163, 184, 0.22)');
           setImportant(control, 'border-radius', '999px');
           setImportant(control, 'font-weight', '650');
+          setImportant(control, 'text-shadow', 'none');
           setImportant(control, 'backdrop-filter', 'blur(18px) saturate(160%)');
           setImportant(control, '-webkit-backdrop-filter', 'blur(18px) saturate(160%)');
 
@@ -314,6 +331,8 @@
           descendants.forEach(function (descendant) {
             setImportant(descendant, 'color', '#334155');
             setImportant(descendant, 'background-color', 'transparent');
+            setImportant(descendant, 'font-weight', '650');
+            setImportant(descendant, 'text-shadow', 'none');
             setImportant(descendant, 'stroke', 'currentColor');
           });
         });
@@ -359,7 +378,7 @@
         while (parent && parent !== doc.body && parent !== doc.documentElement) {
           const rect = parent.getBoundingClientRect();
           const style = win.getComputedStyle(parent);
-          const isToolbarSized = rect.width > 320 && rect.height >= 36 && rect.height < 120;
+          const isToolbarSized = isToolbarRect(rect);
           const isOverlay =
             style.position === 'fixed' ||
             style.position === 'sticky' ||
@@ -390,9 +409,7 @@
 
           return (
             hasToolbarCopy &&
-            rect.width > 320 &&
-            rect.height > 36 &&
-            rect.height < 160
+            isToolbarRect(rect)
           );
         });
 
