@@ -118,6 +118,14 @@
       return protocol === 'http:' || protocol === 'https:';
     }
 
+    function isTopLevelWindow(win) {
+      try {
+        return win.self === win.top;
+      } catch (error) {
+        return false;
+      }
+    }
+
     function hasSandboxToken(sandbox, token) {
       return (` ${sandbox} `).includes(` ${token} `);
     }
@@ -166,6 +174,7 @@
           const canAccessDocument = Boolean(iframeWindow);
           const hasUsableDocument =
             canAccessDocument && (Boolean(src) || hasSrcdoc || hasIframeDocumentContent(iframeWindow));
+          const canCaptureInWindow = canAccessDocument && isOpenableIframeSrc(src);
           let sameOrigin = inferSameOrigin(src);
           let recommendedAction = 'blocked';
           let reason = 'No capturable desde bookmarklet por Same-Origin Policy o sandbox.';
@@ -173,13 +182,13 @@
           if (canAccessDocument && sandbox && !hasSandboxToken(sandbox, 'allow-scripts')) {
             reason =
               'Accesible, pero el sandbox no permite ejecutar scripts de captura.';
-          } else if (canAccessDocument && hasUsableDocument) {
+          } else if (canCaptureInWindow && hasUsableDocument) {
             sameOrigin = sameOrigin === null ? true : sameOrigin;
             recommendedAction = 'capture-direct';
-            reason = 'Accesible desde esta página; se puede capturar directamente.';
+            reason = 'Accesible y con URL propia; se capturará en una ventana dedicada.';
           } else if (canAccessDocument) {
             reason =
-              'Accesible, pero no tiene contenido o URL útil para capturar.';
+              'Accesible, pero no tiene una URL propia adecuada para capturar sin bloquearse.';
           } else if (isOpenableIframeSrc(src)) {
             recommendedAction = 'open-src';
             reason =
@@ -328,6 +337,13 @@
     function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
+
+      if (!isTopLevelWindow(win)) {
+        win.console.warn(
+          '[html.to.design dimension picker] Captura cancelada: capture.js puede quedarse cargando dentro de iframes. Abre el iframe como ventana superior.'
+        );
+        return;
+      }
   
       function appendCaptureScript() {
         logCaptureDiagnostics(win, expectedSize, 'Capture diagnostics before capture.js');
@@ -348,6 +364,64 @@
         win.location.hash = 'figmacapture&figmadelay=1000';
         appendCaptureScript();
       }, 500);
+    }
+
+    function openUrlSizedCapture(url, width, height) {
+      const captureWindow = window.open(
+        url,
+        `h2d-iframe-capture-${Date.now()}`,
+        [
+          `width=${width}`,
+          `height=${height}`,
+          'left=0',
+          'top=0',
+          'resizable=yes',
+          'scrollbars=yes',
+          'noopener=no'
+        ].join(',')
+      );
+
+      if (!captureWindow) {
+        window.alert(
+          'El navegador ha bloqueado la ventana de captura. Abre el iframe en una nueva ventana y lanza allí el bookmarklet.'
+        );
+        return;
+      }
+
+      let attempts = 0;
+      const maxAttempts = 40;
+
+      const interval = window.setInterval(function () {
+        attempts += 1;
+
+        try {
+          if (
+            captureWindow.document &&
+            captureWindow.document.readyState === 'complete'
+          ) {
+            window.clearInterval(interval);
+            captureWindow.focus();
+
+            resizeViewportTo(captureWindow, width, height, function () {
+              captureWindow.setTimeout(function () {
+                injectCapture(captureWindow, { width: width, height: height });
+              }, 500);
+            });
+          }
+        } catch (error) {
+          window.clearInterval(interval);
+          window.alert(
+            'El iframe se abrió, pero ya no es accesible para captura automática. Lanza el bookmarklet manualmente en esa ventana si la página lo permite.'
+          );
+        }
+
+        if (attempts >= maxAttempts) {
+          window.clearInterval(interval);
+          window.alert(
+            'El iframe está tardando demasiado en cargar. Lanza el bookmarklet manualmente en la ventana abierta cuando termine.'
+          );
+        }
+      }, 250);
     }
   
     function openSizedCapture(width, height) {
@@ -422,7 +496,7 @@
 
       function getIframeStatusLabel(info) {
         if (info.recommendedAction === 'capture-direct') {
-          return 'Capturable';
+          return 'Capturable en ventana';
         }
 
         if (info.recommendedAction === 'open-src') {
@@ -955,8 +1029,16 @@
           return;
         }
 
+        if (!isOpenableIframeSrc(info.src)) {
+          window.alert(
+            'Este iframe no tiene una URL propia adecuada. Capturarlo dentro del iframe puede quedarse cargando indefinidamente.'
+          );
+          return;
+        }
+
         closePanel();
-        injectCapture(iframeWindow, getIframeExpectedSize(info, iframeWindow));
+        const expectedSize = getIframeExpectedSize(info, iframeWindow);
+        openUrlSizedCapture(info.src, expectedSize.width, expectedSize.height);
       }
 
       function openIframe(info) {

@@ -5,13 +5,14 @@
 | Caso probado | Resultado esperado | Resultado observado | Estado | Notas |
 | --- | --- | --- | --- | --- |
 | `no-iframes.html` | El panel abre y no muestra `Iframes detectados`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Probar en Chrome con el bookmarklet actualizado. |
-| `same-origin-iframe-parent.html` | El iframe aparece como `Capturable` y muestra `Capturar iframe`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Al pulsar `Capturar iframe`, debe inyectar captura en el iframe, no en el padre. |
-| `srcdoc-iframe.html` | Se clasifica segun accesibilidad real; si es accesible, aparece como `Capturable`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | `srcdoc` sin sandbox suele ser accesible desde el padre. |
+| `same-origin-iframe-parent.html` | El iframe aparece como `Capturable en ventana` y muestra `Capturar iframe`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Al pulsar `Capturar iframe`, debe abrir la URL del iframe en una ventana dedicada y capturarla como top-level. |
+| `srcdoc-iframe.html` | No muestra `Capturar iframe` porque no tiene URL propia `http/https`; debe quedar bloqueado con motivo claro. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Evita la carga infinita de `capture.js` dentro del subframe. |
 | `sandboxed-iframe.html` | No se captura a ciegas; aparece bloqueado o sin accion de captura. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | El fixture usa `sandbox` sin permisos. |
 | `cross-origin-iframe.html` | No aparece como capturable; si tiene `https://example.com`, muestra `Abrir iframe`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | La carga externa puede depender de red, pero la clasificacion no debe ofrecer captura directa. |
 | `iframe-without-src.html` | No muestra una accion inutil de captura o apertura. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | El iframe esta vacio y sin URL propia. |
 | URLs no razonables (`about:blank`, `data:`, `blob:`, `javascript:`) | No deben mostrar `Abrir iframe`; solo `http/https` son abribles. | Auditoria estatica: `isOpenableIframeSrc()` solo acepta `http:` y `https:`. | pass | Pendiente confirmar visualmente en Chrome si se anaden fixtures especificos. |
 | Iframe sandboxed accesible sin `allow-scripts` | No debe mostrar `Capturar iframe`. | Auditoria estatica: si hay `sandbox` accesible sin `allow-scripts`, queda bloqueado. | pass | Evita inyectar `capture.js` donde el sandbox no ejecutaria scripts. |
+| Regresion carga infinita en subframes | `capture.js` no debe inyectarse dentro de `iframe.contentWindow`. | Auditoria estatica: `captureIframe()` abre una ventana dedicada y `injectCapture()` cancela si recibe un subframe. | pass | Cambio aplicado tras observar `Capturing page for clipboard` infinito dentro de iframe. |
 | Regresion toolbar html.to.design | No existen estilos ni funciones propias sobre la toolbar de `capture.js`. | Busqueda estatica sin coincidencias. | pass | Validado con `rg` sobre fuente y outputs generados. |
 | Build del bookmarklet | `marcador-codigoJS` y `dist/bookmarklet.min.js` se generan y coinciden. | `node scripts/build-bookmarklet.cjs` y `cmp` pasan. | pass | Ejecutado durante auditoria. |
 
@@ -59,6 +60,6 @@ El intento de ejecutar el bookmarklet como URL `javascript:` en el navegador int
    - `http://127.0.0.1:8080/qa/fixtures/iframe-without-src.html`
 4. Lanzar el bookmarklet en cada pagina.
 5. Confirmar visualmente los resultados esperados de la tabla.
-6. En el fixture same-origin, pulsar `Capturar iframe` y confirmar que la captura se lanza sobre el contenido del iframe.
+6. En el fixture same-origin, pulsar `Capturar iframe` y confirmar que se abre una ventana dedicada con el contenido del iframe.
 7. En el fixture cross-origin, pulsar `Abrir iframe` y confirmar que se abre una nueva pestana o ventana con `https://example.com`.
 8. Confirmar que la toolbar de html.to.design conserva su UI original cuando aparezca.
