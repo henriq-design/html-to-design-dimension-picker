@@ -1,6 +1,7 @@
 (function () {
     const ROOT_ID = 'h2d-dimension-picker-root';
     const CAPTURE_SCRIPT_URL = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
+    const ENABLE_CAPTURE_METRIC_OVERRIDES = false;
   
     if (document.getElementById(ROOT_ID)) {
       document.getElementById(ROOT_ID).remove();
@@ -44,6 +45,203 @@
         height: 844
       }
     ];
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, function (character) {
+        return {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[character];
+      });
+    }
+
+    function getAbsoluteUrl(value) {
+      if (!value) {
+        return '';
+      }
+
+      try {
+        return new URL(value, window.location.href).href;
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function getHostname(value) {
+      if (!value) {
+        return '';
+      }
+
+      try {
+        return new URL(value, window.location.href).hostname;
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function inferSameOrigin(value) {
+      if (!value) {
+        return null;
+      }
+
+      try {
+        const url = new URL(value, window.location.href);
+
+        if (url.protocol === 'about:' || url.protocol === 'javascript:') {
+          return null;
+        }
+
+        return url.origin === window.location.origin;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function getUrlProtocol(value) {
+      if (!value) {
+        return '';
+      }
+
+      try {
+        return new URL(value, window.location.href).protocol;
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function isOpenableIframeSrc(value) {
+      const protocol = getUrlProtocol(value);
+
+      return protocol === 'http:' || protocol === 'https:';
+    }
+
+    function isTopLevelWindow(win) {
+      try {
+        return win.self === win.top;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function hasSandboxToken(sandbox, token) {
+      return (` ${sandbox} `).includes(` ${token} `);
+    }
+
+    function getAccessibleIframeWindow(iframe) {
+      try {
+        const iframeWindow = iframe.contentWindow;
+        const iframeDocument =
+          iframe.contentDocument || (iframeWindow ? iframeWindow.document : null);
+
+        if (iframeWindow && iframeDocument && iframeDocument.documentElement) {
+          return iframeWindow;
+        }
+      } catch (error) {
+        // Cross-origin or sandboxed frames throw here by design.
+      }
+
+      return null;
+    }
+
+    function hasIframeDocumentContent(iframeWindow) {
+      try {
+        const doc = iframeWindow.document;
+        const body = doc.body;
+
+        return Boolean(
+          body &&
+            (body.children.length > 0 || (body.textContent || '').trim())
+        );
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function scanIframes() {
+      return Array.prototype.slice.call(document.querySelectorAll('iframe')).map(
+        function (iframe, index) {
+          const rect = iframe.getBoundingClientRect();
+          const rawSrc = iframe.getAttribute('src') || '';
+          const src = getAbsoluteUrl(rawSrc || iframe.src || '');
+          const sandbox = iframe.hasAttribute('sandbox')
+            ? iframe.getAttribute('sandbox') || 'sandbox'
+            : '';
+          const hasSrcdoc = iframe.hasAttribute('srcdoc');
+          const iframeWindow = getAccessibleIframeWindow(iframe);
+          const canAccessDocument = Boolean(iframeWindow);
+          const hasUsableDocument =
+            canAccessDocument && (Boolean(src) || hasSrcdoc || hasIframeDocumentContent(iframeWindow));
+          const canCaptureInWindow = canAccessDocument && isOpenableIframeSrc(src);
+          let sameOrigin = inferSameOrigin(src);
+          let recommendedAction = 'blocked';
+          let reason = 'No capturable desde bookmarklet por Same-Origin Policy o sandbox.';
+
+          if (canAccessDocument && sandbox && !hasSandboxToken(sandbox, 'allow-scripts')) {
+            reason =
+              'Accesible, pero el sandbox no permite ejecutar scripts de captura.';
+          } else if (canCaptureInWindow && hasUsableDocument) {
+            sameOrigin = sameOrigin === null ? true : sameOrigin;
+            recommendedAction = 'capture-direct';
+            reason = 'Accesible y con URL propia; se capturará en una ventana dedicada.';
+          } else if (canAccessDocument) {
+            reason =
+              'Accesible, pero no tiene una URL propia adecuada para capturar sin bloquearse.';
+          } else if (isOpenableIframeSrc(src)) {
+            recommendedAction = 'open-src';
+            reason =
+              'No accesible desde bookmarklet por Same-Origin Policy o sandbox; puedes abrir su URL.';
+          } else if (hasSrcdoc) {
+            reason =
+              'No capturable desde bookmarklet por Same-Origin Policy o sandbox. No tiene URL propia.';
+          } else if (src) {
+            reason =
+              'No capturable desde bookmarklet y su URL no es adecuada para abrirla directamente.';
+          }
+
+          return {
+            index: index,
+            title: iframe.getAttribute('title') || '',
+            name: iframe.getAttribute('name') || '',
+            src: src,
+            visualWidth: Math.round(rect.width),
+            visualHeight: Math.round(rect.height),
+            sandbox: sandbox,
+            hasSrcdoc: hasSrcdoc,
+            canAccessDocument: canAccessDocument,
+            sameOrigin: sameOrigin,
+            recommendedAction: recommendedAction,
+            reason: reason,
+            element: iframe
+          };
+        }
+      );
+    }
+
+    function getIframeLabel(info) {
+      return (
+        info.title ||
+        info.name ||
+        getHostname(info.src) ||
+        `Iframe ${info.index + 1}`
+      );
+    }
+
+    function getIframeExpectedSize(info, iframeWindow) {
+      try {
+        return {
+          width: iframeWindow.innerWidth || info.visualWidth,
+          height: iframeWindow.innerHeight || info.visualHeight
+        };
+      } catch (error) {
+        return {
+          width: info.visualWidth,
+          height: info.visualHeight
+        };
+      }
+    }
   
     function getCaptureDiagnostics(win, expectedSize) {
       return {
@@ -54,7 +252,7 @@
         'document.documentElement.clientWidth': win.document.documentElement.clientWidth,
         'document.documentElement.clientHeight': win.document.documentElement.clientHeight,
         'document.documentElement.scrollWidth': win.document.documentElement.scrollWidth,
-        'document.body.scrollWidth': win.document.body ? win.document.body.scrollWidth : undefined,
+        'document.documentElement.scrollHeight': win.document.documentElement.scrollHeight,
         'window.devicePixelRatio': win.devicePixelRatio
       };
     }
@@ -136,355 +334,23 @@
       win.__h2dMetricOverridesApplied = true;
     }
 
-    function installCaptureToolbarStyles(win) {
-      const doc = win.document;
-
-      if (!doc || !doc.head) {
-        return;
-      }
-
-      const toolbarCss = `
-        .h2d-capture-toolbar {
-          position: relative !important;
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(246, 248, 252, 0.68)),
-            rgba(246, 248, 252, 0.62) !important;
-          border: 1px solid rgba(255, 255, 255, 0.78) !important;
-          border-radius: 26px !important;
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.92),
-            inset 0 -1px 0 rgba(148, 163, 184, 0.18),
-            0 18px 55px rgba(15, 23, 42, 0.18) !important;
-          color: #0f172a !important;
-          overflow: hidden !important;
-          backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
-          -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04) !important;
-        }
-
-        .h2d-capture-toolbar::before {
-          content: "" !important;
-          position: absolute !important;
-          inset: 0 !important;
-          pointer-events: none !important;
-          background:
-            linear-gradient(145deg, rgba(255, 255, 255, 0.72), transparent 28%),
-            radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.5), transparent 24%),
-            radial-gradient(circle at 0% 100%, rgba(125, 211, 252, 0.16), transparent 30%) !important;
-          opacity: 0.7 !important;
-        }
-
-        .h2d-capture-toolbar,
-        .h2d-capture-toolbar * {
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif !important;
-          letter-spacing: 0 !important;
-        }
-
-        .h2d-capture-toolbar button,
-        .h2d-capture-toolbar [role="button"] {
-          color: #334155 !important;
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)),
-            rgba(255, 255, 255, 0.44) !important;
-          border: 1px solid rgba(148, 163, 184, 0.22) !important;
-          border-radius: 999px !important;
-          box-shadow:
-            inset 0 1px 0 rgba(255, 255, 255, 0.84),
-            0 8px 20px rgba(15, 23, 42, 0.06) !important;
-          font-weight: 650 !important;
-          backdrop-filter: blur(18px) saturate(160%) !important;
-          -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
-        }
-
-        .h2d-capture-toolbar button:hover,
-        .h2d-capture-toolbar [role="button"]:hover {
-          background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
-            rgba(255, 255, 255, 0.5) !important;
-          border-color: rgba(148, 163, 184, 0.32) !important;
-        }
-
-        .h2d-capture-toolbar svg,
-        .h2d-capture-toolbar path {
-          color: #475569 !important;
-          stroke: currentColor !important;
-        }
-
-        .h2d-capture-toolbar [style*="background"] {
-          background: transparent !important;
-        }
-      `;
-
-      function injectStyle(root) {
-        const target = root.head || root;
-
-        if (!target || target.querySelector('#h2d-capture-toolbar-style')) {
-          return;
-        }
-
-        const style = doc.createElement('style');
-        style.id = 'h2d-capture-toolbar-style';
-        style.textContent = toolbarCss;
-        target.appendChild(style);
-      }
-
-      injectStyle(doc);
-
-      function setImportant(element, property, value) {
-        if (element && element.style) {
-          element.style.setProperty(property, value, 'important');
-        }
-      }
-
-      function isCaptureLabel(text) {
-        return (
-          text.includes('Copy to clipboard') ||
-          text.includes('Copiar al portapapeles') ||
-          text.includes('Entire screen') ||
-          text.includes('Pantalla completa') ||
-          text.includes('Select element') ||
-          text.includes('Seleccionar elemento')
-        );
-      }
-
-      function isToolbarRect(rect) {
-        const maxToolbarWidth = Math.min(1120, win.innerWidth - 80);
-
-        return (
-          rect.width > 320 &&
-          rect.width <= maxToolbarWidth &&
-          rect.height > 36 &&
-          rect.height < 160
-        );
-      }
-
-      function applyRootInlineStyles(toolbar) {
-        setImportant(toolbar, 'isolation', 'isolate');
-        setImportant(
-          toolbar,
-          'background',
-          'linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(246, 248, 252, 0.66)), rgba(246, 248, 252, 0.6)'
-        );
-        setImportant(toolbar, 'border', '1px solid rgba(255, 255, 255, 0.78)');
-        setImportant(toolbar, 'border-radius', '22px');
-        setImportant(
-          toolbar,
-          'box-shadow',
-          'inset 0 1px 0 rgba(255, 255, 255, 0.92), inset 0 -1px 0 rgba(148, 163, 184, 0.18), 0 18px 55px rgba(15, 23, 42, 0.18)'
-        );
-        setImportant(toolbar, 'color', '#0f172a');
-        setImportant(toolbar, 'overflow', 'hidden');
-        setImportant(toolbar, 'backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
-        setImportant(toolbar, '-webkit-backdrop-filter', 'blur(24px) saturate(180%) brightness(1.04)');
-      }
-
-      function clearCompetingInlineStyles(toolbar) {
-        const elements = toolbar.querySelectorAll ? toolbar.querySelectorAll('*') : [];
-
-        elements.forEach(function (element) {
-          setImportant(element, 'box-shadow', 'none');
-          setImportant(element, 'border-color', 'rgba(148, 163, 184, 0.16)');
-
-          if (element !== toolbar) {
-            setImportant(element, 'background-color', 'transparent');
-          }
-        });
-      }
-
-      function applyControlInlineStyles(toolbar) {
-        const controls = toolbar.querySelectorAll
-          ? toolbar.querySelectorAll('button, [role="button"], a')
-          : [];
-
-        controls.forEach(function (control) {
-          const text = control.textContent || '';
-          const isCaptureControl = isCaptureLabel(text);
-
-          if (
-            !isCaptureControl &&
-            control.tagName !== 'BUTTON' &&
-            control.getAttribute('role') !== 'button'
-          ) {
-            return;
-          }
-
-          setImportant(control, 'color', '#334155');
-          setImportant(
-            control,
-            'background',
-            'linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)), rgba(255, 255, 255, 0.44)'
-          );
-          setImportant(control, 'border', '1px solid rgba(148, 163, 184, 0.22)');
-          setImportant(control, 'border-radius', '999px');
-          setImportant(control, 'font-weight', '650');
-          setImportant(control, 'text-shadow', 'none');
-          setImportant(control, 'backdrop-filter', 'blur(18px) saturate(160%)');
-          setImportant(control, '-webkit-backdrop-filter', 'blur(18px) saturate(160%)');
-
-          const descendants = control.querySelectorAll ? control.querySelectorAll('*') : [];
-          descendants.forEach(function (descendant) {
-            setImportant(descendant, 'color', '#334155');
-            setImportant(descendant, 'background-color', 'transparent');
-            setImportant(descendant, 'font-weight', '650');
-            setImportant(descendant, 'text-shadow', 'none');
-            setImportant(descendant, 'stroke', 'currentColor');
-          });
-        });
-      }
-
-      function getDeepElements(root) {
-        const elements = [];
-        const tree = root.querySelectorAll ? root.querySelectorAll('*') : [];
-
-        tree.forEach(function (element) {
-          elements.push(element);
-
-          if (element.shadowRoot) {
-            injectStyle(element.shadowRoot);
-            getDeepElements(element.shadowRoot).forEach(function (shadowElement) {
-              elements.push(shadowElement);
-            });
-          }
-
-          if (element.tagName === 'IFRAME') {
-            try {
-              const iframeDoc = element.contentDocument;
-
-              if (iframeDoc) {
-                injectStyle(iframeDoc);
-                getDeepElements(iframeDoc).forEach(function (iframeElement) {
-                  elements.push(iframeElement);
-                });
-              }
-            } catch (error) {
-              // Cross-origin iframes are intentionally ignored.
-            }
-          }
-        });
-
-        return elements;
-      }
-
-      function getVisualToolbarContainer(element) {
-        let toolbar = element;
-        let parent = element.parentElement;
-
-        while (parent && parent !== doc.body && parent !== doc.documentElement) {
-          const rect = parent.getBoundingClientRect();
-          const style = win.getComputedStyle(parent);
-          const isToolbarSized = isToolbarRect(rect);
-          const isOverlay =
-            style.position === 'fixed' ||
-            style.position === 'sticky' ||
-            Number(style.zIndex) > 100;
-
-          if (!isToolbarSized || !isOverlay) {
-            break;
-          }
-
-          toolbar = parent;
-          parent = parent.parentElement;
-        }
-
-        return toolbar;
-      }
-
-      function findToolbarRoot() {
-        const matches = getDeepElements(doc).filter(function (element) {
-          const text = element.textContent || '';
-          const rect = element.getBoundingClientRect();
-          const hasToolbarCopy =
-            (text.includes('Copy to clipboard') ||
-              text.includes('Copiar al portapapeles')) &&
-            (text.includes('Entire screen') ||
-              text.includes('Pantalla completa') ||
-              text.includes('Select element') ||
-              text.includes('Seleccionar elemento'));
-
-          return (
-            hasToolbarCopy &&
-            isToolbarRect(rect)
-          );
-        });
-
-        return matches.sort(function (a, b) {
-          return (
-            a.getBoundingClientRect().height - b.getBoundingClientRect().height
-          );
-        }).map(getVisualToolbarContainer)[0];
-      }
-
-      function applyToolbarClass() {
-        const toolbar = findToolbarRoot();
-
-        if (toolbar) {
-          toolbar.classList.add('h2d-capture-toolbar');
-          applyRootInlineStyles(toolbar);
-          clearCompetingInlineStyles(toolbar);
-          applyControlInlineStyles(toolbar);
-          win.console.info('[html.to.design dimension picker] Toolbar glass styles applied.');
-        }
-      }
-
-      let attempts = 0;
-      const interval = win.setInterval(function () {
-        attempts += 1;
-        applyToolbarClass();
-
-        if (attempts >= 80) {
-          win.clearInterval(interval);
-        }
-      }, 100);
-
-      if (win.MutationObserver && doc.body) {
-        const observer = new win.MutationObserver(applyToolbarClass);
-        observer.observe(doc.body, { childList: true, subtree: true });
-
-        win.setTimeout(function () {
-          observer.disconnect();
-        }, 10000);
-      }
-
-      applyToolbarClass();
-      win.__h2dCaptureToolbarStylesInstalled = true;
-    }
-
-    function exposeCaptureShadowRoots(win) {
-      if (win.__h2dShadowRootsExposed || !win.Element || !win.Element.prototype) {
-        return;
-      }
-
-      const originalAttachShadow = win.Element.prototype.attachShadow;
-
-      if (!originalAttachShadow) {
-        return;
-      }
-
-      win.Element.prototype.attachShadow = function (init) {
-        const options = Object.assign({}, init, { mode: 'open' });
-
-        return originalAttachShadow.call(this, options);
-      };
-
-      win.__h2dShadowRootsExposed = true;
-    }
-
     function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
+
+      if (!isTopLevelWindow(win)) {
+        win.console.warn(
+          '[html.to.design dimension picker] Captura cancelada: capture.js puede quedarse cargando dentro de iframes. Abre el iframe como ventana superior.'
+        );
+        return;
+      }
   
       function appendCaptureScript() {
-        exposeCaptureShadowRoots(win);
-        logCaptureDiagnostics(win, expectedSize, 'Raw capture diagnostics');
-        applyCaptureMetricOverrides(win, expectedSize);
-        logCaptureDiagnostics(win, expectedSize, 'Effective capture diagnostics');
-        installCaptureToolbarStyles(win);
+        logCaptureDiagnostics(win, expectedSize, 'Capture diagnostics before capture.js');
+
+        if (ENABLE_CAPTURE_METRIC_OVERRIDES) {
+          applyCaptureMetricOverrides(win, expectedSize);
+        }
 
         const script = doc.createElement('script');
         script.src = CAPTURE_SCRIPT_URL;
@@ -498,6 +364,64 @@
         win.location.hash = 'figmacapture&figmadelay=1000';
         appendCaptureScript();
       }, 500);
+    }
+
+    function openUrlSizedCapture(url, width, height) {
+      const captureWindow = window.open(
+        url,
+        `h2d-iframe-capture-${Date.now()}`,
+        [
+          `width=${width}`,
+          `height=${height}`,
+          'left=0',
+          'top=0',
+          'resizable=yes',
+          'scrollbars=yes',
+          'noopener=no'
+        ].join(',')
+      );
+
+      if (!captureWindow) {
+        window.alert(
+          'El navegador ha bloqueado la ventana de captura. Abre el iframe en una nueva ventana y lanza allí el bookmarklet.'
+        );
+        return;
+      }
+
+      let attempts = 0;
+      const maxAttempts = 40;
+
+      const interval = window.setInterval(function () {
+        attempts += 1;
+
+        try {
+          if (
+            captureWindow.document &&
+            captureWindow.document.readyState === 'complete'
+          ) {
+            window.clearInterval(interval);
+            captureWindow.focus();
+
+            resizeViewportTo(captureWindow, width, height, function () {
+              captureWindow.setTimeout(function () {
+                injectCapture(captureWindow, { width: width, height: height });
+              }, 500);
+            });
+          }
+        } catch (error) {
+          window.clearInterval(interval);
+          window.alert(
+            'El iframe se abrió, pero ya no es accesible para captura automática. Lanza el bookmarklet manualmente en esa ventana si la página lo permite.'
+          );
+        }
+
+        if (attempts >= maxAttempts) {
+          window.clearInterval(interval);
+          window.alert(
+            'El iframe está tardando demasiado en cargar. Lanza el bookmarklet manualmente en la ventana abierta cuando termine.'
+          );
+        }
+      }, 250);
     }
   
     function openSizedCapture(width, height) {
@@ -568,6 +492,75 @@
       host.style.zIndex = '2147483647';
   
       const shadow = host.attachShadow({ mode: 'open' });
+      const iframeScan = scanIframes();
+
+      function getIframeStatusLabel(info) {
+        if (info.recommendedAction === 'capture-direct') {
+          return 'Capturable en ventana';
+        }
+
+        if (info.recommendedAction === 'open-src') {
+          return 'Abrir en nueva ventana';
+        }
+
+        return 'Bloqueado';
+      }
+
+      function renderIframeAction(info) {
+        if (info.recommendedAction === 'capture-direct') {
+          return `
+            <button class="iframe-action" type="button" data-iframe-action="capture" data-iframe-index="${info.index}">
+              Capturar iframe
+            </button>
+          `;
+        }
+
+        if (info.recommendedAction === 'open-src') {
+          return `
+            <button class="iframe-action" type="button" data-iframe-action="open" data-iframe-index="${info.index}">
+              Abrir iframe
+            </button>
+          `;
+        }
+
+        return '';
+      }
+
+      function renderIframeInfo(info) {
+        const label = getIframeLabel(info);
+        const sandboxLabel = info.sandbox
+          ? ` · sandbox: ${info.sandbox}`
+          : '';
+
+        return `
+          <article class="iframe-item">
+            <div class="iframe-topline">
+              <strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong>
+              <span>${escapeHtml(getIframeStatusLabel(info))}</span>
+            </div>
+            <div class="iframe-meta">
+              ${info.visualWidth} × ${info.visualHeight}${escapeHtml(sandboxLabel)}
+            </div>
+            <div class="iframe-reason">${escapeHtml(info.reason)}</div>
+            ${renderIframeAction(info)}
+          </article>
+        `;
+      }
+
+      function renderIframeSection() {
+        if (!iframeScan.length) {
+          return '';
+        }
+
+        return `
+          <section class="iframe-section" aria-labelledby="h2d-iframes-title">
+            <h3 id="h2d-iframes-title">Iframes detectados</h3>
+            <div class="iframe-list">
+              ${iframeScan.map(renderIframeInfo).join('')}
+            </div>
+          </section>
+        `;
+      }
   
       shadow.innerHTML = `
         <style>
@@ -657,6 +650,15 @@
             font-size: 13px;
             line-height: 18px;
             font-weight: 450;
+          }
+
+          h3 {
+            margin: 0 0 8px;
+            color: #0f172a;
+            font-size: 13px;
+            line-height: 18px;
+            font-weight: 700;
+            letter-spacing: 0;
           }
   
           button,
@@ -817,6 +819,84 @@
               rgba(255, 255, 255, 0.5);
             border-color: rgba(148, 163, 184, 0.32);
           }
+
+          .iframe-section {
+            position: relative;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(148, 163, 184, 0.22);
+          }
+
+          .iframe-list {
+            display: grid;
+            gap: 8px;
+            max-height: 178px;
+            overflow: auto;
+            padding-right: 2px;
+          }
+
+          .iframe-item {
+            padding: 10px;
+            color: #334155;
+            background: rgba(255, 255, 255, 0.38);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 14px;
+          }
+
+          .iframe-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            color: #0f172a;
+            font-size: 12px;
+            line-height: 16px;
+          }
+
+          .iframe-topline strong {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .iframe-topline span {
+            flex: 0 0 auto;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 650;
+          }
+
+          .iframe-meta,
+          .iframe-reason {
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 15px;
+          }
+
+          .iframe-action {
+            width: 100%;
+            min-height: 32px;
+            margin-top: 8px;
+            padding: 6px 10px;
+            color: #334155;
+            background:
+              linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)),
+              rgba(255, 255, 255, 0.44);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 650;
+          }
+
+          .iframe-action:hover {
+            border-color: rgba(148, 163, 184, 0.32);
+            background:
+              linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
+              rgba(255, 255, 255, 0.5);
+          }
   
           .hint {
             position: relative;
@@ -869,6 +949,8 @@
               Capturar
             </button>
           </div>
+
+          ${renderIframeSection()}
   
           <div class="hint">
             Si eliges otro tamaño, se abrirá una ventana de captura con ese viewport.
@@ -883,6 +965,7 @@
       const heightInput = shadow.getElementById('height');
       const captureButton = shadow.querySelector('[data-action="capture"]');
       const closeButtons = shadow.querySelectorAll('[data-action="close"]');
+      const iframeButtons = shadow.querySelectorAll('[data-iframe-action]');
   
       function closePanel() {
         host.remove();
@@ -927,6 +1010,64 @@
   
         openSizedCapture(width, height);
       }
+
+      function getIframeInfoFromButton(button) {
+        const iframeIndex = Number(button.getAttribute('data-iframe-index'));
+
+        return iframeScan.find(function (info) {
+          return info.index === iframeIndex;
+        });
+      }
+
+      function captureIframe(info) {
+        const iframeWindow = getAccessibleIframeWindow(info.element);
+
+        if (!iframeWindow) {
+          window.alert(
+            'Este iframe ya no es accesible desde el bookmarklet. Puede estar bloqueado por Same-Origin Policy o sandbox.'
+          );
+          return;
+        }
+
+        if (!isOpenableIframeSrc(info.src)) {
+          window.alert(
+            'Este iframe no tiene una URL propia adecuada. Capturarlo dentro del iframe puede quedarse cargando indefinidamente.'
+          );
+          return;
+        }
+
+        closePanel();
+        const expectedSize = getIframeExpectedSize(info, iframeWindow);
+        openUrlSizedCapture(info.src, expectedSize.width, expectedSize.height);
+      }
+
+      function openIframe(info) {
+        const openedWindow = window.open(info.src, '_blank', 'noopener,noreferrer');
+
+        if (!openedWindow) {
+          window.alert(
+            'El navegador ha bloqueado la nueva ventana. Abre manualmente la URL del iframe si está disponible.'
+          );
+        }
+      }
+
+      function handleIframeAction(event) {
+        const button = event.currentTarget;
+        const info = getIframeInfoFromButton(button);
+
+        if (!info) {
+          return;
+        }
+
+        if (button.getAttribute('data-iframe-action') === 'capture') {
+          captureIframe(info);
+          return;
+        }
+
+        if (button.getAttribute('data-iframe-action') === 'open') {
+          openIframe(info);
+        }
+      }
   
       function handleEscape(event) {
         if (event.key === 'Escape') {
@@ -939,6 +1080,10 @@
   
       closeButtons.forEach(function (button) {
         button.addEventListener('click', closePanel);
+      });
+
+      iframeButtons.forEach(function (button) {
+        button.addEventListener('click', handleIframeAction);
       });
   
       document.addEventListener('keydown', handleEscape);
