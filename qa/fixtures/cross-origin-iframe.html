@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Iframe cross-origin</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 32px;
+      }
+
+      iframe {
+        width: 520px;
+        height: 240px;
+        border: 2px solid #2b6cb0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Padre con iframe cross-origin</h1>
+      <iframe
+        title="Example cross-origin"
+        name="exampleExternal"
+        src="https://example.com"
+      ></iframe>
+    </main>
+  </body>
+</html>

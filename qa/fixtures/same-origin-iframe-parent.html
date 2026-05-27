@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Iframe same-origin padre</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 32px;
+      }
+
+      iframe {
+        width: 520px;
+        height: 240px;
+        border: 2px solid #2f855a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Padre con iframe same-origin</h1>
+      <iframe
+        title="Preview same-origin"
+        name="sameOriginPreview"
+        src="./same-origin-iframe-child.html"
+      ></iframe>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Iframe srcdoc</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 32px;
+      }
+
+      iframe {
+        width: 520px;
+        height: 220px;
+        border: 2px solid #805ad5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Padre con iframe srcdoc</h1>
+      <iframe
+        title="Preview srcdoc"
+        srcdoc="<main style='font-family: system-ui; padding: 24px; background: #faf5ff; min-height: 160px;'><h1>Contenido srcdoc</h1><p>Debe clasificarse segun accesibilidad real.</p></main>"
+      ></iframe>
+    </main>
+  </body>
+</html>
