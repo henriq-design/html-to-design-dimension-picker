@@ -1,5 +1,7 @@
 # Capture flow audit
 
+> Documento histórico de la auditoría de toolbar y métricas. La preparación del hash se encapsuló posteriormente con History API; consulta `embedded-documents-capture.md` para el flujo vigente.
+
 ## Causa probable
 
 La regresión más probable venía de `installCaptureToolbarStyles(win)`. Esa función detectaba la toolbar creada por `capture.js`, le añadía la clase `h2d-capture-toolbar`, inyectaba CSS propio y escribía estilos inline con `!important` sobre el contenedor y sus controles.

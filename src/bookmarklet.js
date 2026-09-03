@@ -1,6 +1,7 @@
 (function () {
     const ROOT_ID = 'h2d-dimension-picker-root';
     const CAPTURE_SCRIPT_URL = 'https://mcp.figma.com/mcp/html-to-design/capture.js';
+    const CAPTURE_HASH = 'figmacapture&figmadelay=1000';
     const ENABLE_CAPTURE_METRIC_OVERRIDES = false;
   
     if (document.getElementById(ROOT_ID)) {
@@ -58,13 +59,13 @@
       });
     }
 
-    function getAbsoluteUrl(value) {
+    function getAbsoluteUrl(value, baseUrl) {
       if (!value) {
         return '';
       }
 
       try {
-        return new URL(value, window.location.href).href;
+        return new URL(value, baseUrl || window.location.href).href;
       } catch (error) {
         return value;
       }
@@ -90,7 +91,12 @@
       try {
         const url = new URL(value, window.location.href);
 
-        if (url.protocol === 'about:' || url.protocol === 'javascript:') {
+        if (
+          url.protocol === 'about:' ||
+          url.protocol === 'blob:' ||
+          url.protocol === 'data:' ||
+          url.protocol === 'javascript:'
+        ) {
           return null;
         }
 
@@ -112,7 +118,7 @@
       }
     }
 
-    function isOpenableIframeSrc(value) {
+    function isHttpUrl(value) {
       const protocol = getUrlProtocol(value);
 
       return protocol === 'http:' || protocol === 'https:';
@@ -130,26 +136,26 @@
       return (` ${sandbox} `).includes(` ${token} `);
     }
 
-    function getAccessibleIframeWindow(iframe) {
+    function getAccessibleEmbeddedDocument(element) {
       try {
-        const iframeWindow = iframe.contentWindow;
-        const iframeDocument =
-          iframe.contentDocument || (iframeWindow ? iframeWindow.document : null);
+        const embeddedWindow = element.contentWindow || null;
+        const embeddedDocument =
+          element.contentDocument ||
+          (embeddedWindow ? embeddedWindow.document : null);
 
-        if (iframeWindow && iframeDocument && iframeDocument.documentElement) {
-          return iframeWindow;
+        if (embeddedDocument && embeddedDocument.documentElement) {
+          return embeddedDocument;
         }
       } catch (error) {
-        // Cross-origin or sandboxed frames throw here by design.
+        // Los documentos cross-origin o con sandbox pueden lanzar una excepción.
       }
 
       return null;
     }
 
-    function hasIframeDocumentContent(iframeWindow) {
+    function hasEmbeddedDocumentContent(embeddedDocument) {
       try {
-        const doc = iframeWindow.document;
-        const body = doc.body;
+        const body = embeddedDocument.body;
 
         return Boolean(
           body &&
@@ -160,85 +166,233 @@
       }
     }
 
-    function scanIframes() {
-      return Array.prototype.slice.call(document.querySelectorAll('iframe')).map(
-        function (iframe, index) {
-          const rect = iframe.getBoundingClientRect();
-          const rawSrc = iframe.getAttribute('src') || '';
-          const src = getAbsoluteUrl(rawSrc || iframe.src || '');
-          const sandbox = iframe.hasAttribute('sandbox')
-            ? iframe.getAttribute('sandbox') || 'sandbox'
-            : '';
-          const hasSrcdoc = iframe.hasAttribute('srcdoc');
-          const iframeWindow = getAccessibleIframeWindow(iframe);
-          const canAccessDocument = Boolean(iframeWindow);
-          const hasUsableDocument =
-            canAccessDocument && (Boolean(src) || hasSrcdoc || hasIframeDocumentContent(iframeWindow));
-          const canCaptureInWindow = canAccessDocument && isOpenableIframeSrc(src);
-          let sameOrigin = inferSameOrigin(src);
-          let recommendedAction = 'blocked';
-          let reason = 'No capturable desde bookmarklet por Same-Origin Policy o sandbox.';
+    function decodeDataHtmlUrl(value) {
+      if (!value || !/^data:text\/html(?:;[^,]*)?,/i.test(value)) {
+        return null;
+      }
 
-          if (canAccessDocument && sandbox && !hasSandboxToken(sandbox, 'allow-scripts')) {
-            reason =
-              'Accesible, pero el sandbox no permite ejecutar scripts de captura.';
-          } else if (canCaptureInWindow && hasUsableDocument) {
-            sameOrigin = sameOrigin === null ? true : sameOrigin;
-            recommendedAction = 'capture-direct';
-            reason = 'Accesible y con URL propia; se capturará en una ventana dedicada.';
-          } else if (canAccessDocument) {
-            reason =
-              'Accesible, pero no tiene una URL propia adecuada para capturar sin bloquearse.';
-          } else if (isOpenableIframeSrc(src)) {
-            recommendedAction = 'open-src';
-            reason =
-              'No accesible desde bookmarklet por Same-Origin Policy o sandbox; puedes abrir su URL.';
-          } else if (hasSrcdoc) {
-            reason =
-              'No capturable desde bookmarklet por Same-Origin Policy o sandbox. No tiene URL propia.';
-          } else if (src) {
-            reason =
-              'No capturable desde bookmarklet y su URL no es adecuada para abrirla directamente.';
+      const commaIndex = value.indexOf(',');
+      const metadata = value.slice(0, commaIndex);
+      const payload = value.slice(commaIndex + 1);
+
+      try {
+        if (/;base64(?:;|$)/i.test(metadata)) {
+          const binary = window.atob(payload.replace(/\s/g, ''));
+          const bytes = new Uint8Array(binary.length);
+
+          for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
           }
 
-          return {
-            index: index,
-            title: iframe.getAttribute('title') || '',
-            name: iframe.getAttribute('name') || '',
-            src: src,
-            visualWidth: Math.round(rect.width),
-            visualHeight: Math.round(rect.height),
-            sandbox: sandbox,
-            hasSrcdoc: hasSrcdoc,
-            canAccessDocument: canAccessDocument,
-            sameOrigin: sameOrigin,
-            recommendedAction: recommendedAction,
-            reason: reason,
-            element: iframe
-          };
+          if (typeof window.TextDecoder === 'function') {
+            return new window.TextDecoder('utf-8').decode(bytes);
+          }
+
+          return decodeURIComponent(
+            Array.prototype.map
+              .call(bytes, function (byte) {
+                return `%${byte.toString(16).padStart(2, '0')}`;
+              })
+              .join('')
+          );
         }
-      );
+
+        return decodeURIComponent(payload);
+      } catch (error) {
+        return null;
+      }
     }
 
-    function getIframeLabel(info) {
+    function getTargetSource(element, kind) {
+      if (kind === 'iframe' && element.hasAttribute('srcdoc')) {
+        return {
+          sourceMode: 'srcdoc',
+          inlineHtml: element.getAttribute('srcdoc') || '',
+          rawSource: element.getAttribute('srcdoc') || '',
+          url: ''
+        };
+      }
+
+      const rawSource =
+        kind === 'iframe'
+          ? element.getAttribute('src') || ''
+          : element.getAttribute('data') || '';
+      const inlineHtml = decodeDataHtmlUrl(rawSource);
+
+      if (inlineHtml !== null) {
+        return {
+          sourceMode: 'inline-html',
+          inlineHtml: inlineHtml,
+          rawSource: rawSource,
+          url: getAbsoluteUrl(rawSource)
+        };
+      }
+
+      const url = getAbsoluteUrl(
+        rawSource ||
+          (kind === 'iframe' ? element.src || '' : element.data || '')
+      );
+
+      if (isHttpUrl(url)) {
+        return {
+          sourceMode: 'url',
+          inlineHtml: '',
+          rawSource: rawSource,
+          url: url
+        };
+      }
+
+      return {
+        sourceMode: 'none',
+        inlineHtml: '',
+        rawSource: rawSource,
+        url: url
+      };
+    }
+
+    function getTargetVisibility(element, rect) {
+      try {
+        const style = window.getComputedStyle(element);
+
+        return Boolean(
+          rect.width > 1 &&
+            rect.height > 1 &&
+            element.getClientRects().length &&
+            !element.hidden &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            style.visibility !== 'collapse' &&
+            Number(style.opacity) !== 0
+        );
+      } catch (error) {
+        return rect.width > 1 && rect.height > 1;
+      }
+    }
+
+    function classifyCaptureTarget(element, index) {
+      const kind = element.tagName.toLowerCase();
+      const source = getTargetSource(element, kind);
+      const rect = element.getBoundingClientRect();
+      const sandbox =
+        kind === 'iframe' && element.hasAttribute('sandbox')
+          ? element.getAttribute('sandbox') || 'sandbox'
+          : '';
+      const embeddedDocument = getAccessibleEmbeddedDocument(element);
+      const canAccessDocument = Boolean(embeddedDocument);
+      const hasDocumentContent =
+        canAccessDocument && hasEmbeddedDocumentContent(embeddedDocument);
+      const hasInlineSource = Boolean((source.inlineHtml || '').trim());
+      let sameOrigin = inferSameOrigin(source.url);
+      let recommendedAction = 'blocked';
+      let reason = 'No hay una fuente HTML capturable para este elemento.';
+
+      if (source.sourceMode === 'url') {
+        if (
+          canAccessDocument &&
+          sandbox &&
+          !hasSandboxToken(sandbox, 'allow-scripts')
+        ) {
+          reason =
+            'El documento es accesible, pero elevar su URL eliminaría restricciones del sandbox.';
+        } else if (canAccessDocument) {
+          sameOrigin = sameOrigin === null ? true : sameOrigin;
+          recommendedAction = 'capture-url';
+          reason =
+            'Documento accesible con URL propia; se capturará en una ventana dedicada.';
+        } else {
+          recommendedAction = 'open-url';
+          reason =
+            'No accesible por origen o sandbox; se puede abrir su URL como fallback.';
+        }
+      } else if (
+        (source.sourceMode === 'srcdoc' || source.sourceMode === 'inline-html') &&
+        (hasDocumentContent || hasInlineSource)
+      ) {
+        recommendedAction = 'capture-inline';
+        reason = canAccessDocument
+          ? 'Se reconstruirá un snapshot estático del DOM actual en una ventana dedicada.'
+          : 'Se reconstruirá un snapshot estático desde el HTML inline original.';
+      } else if (source.rawSource) {
+        reason =
+          'La fuente no es una URL http/https ni HTML inline data:text/html válido.';
+      }
+
+      return {
+        id: `capture-target-${index}`,
+        index: index,
+        kind: kind,
+        title: element.getAttribute('title') || '',
+        name: element.getAttribute('name') || '',
+        sourceMode: source.sourceMode,
+        rawSource: source.rawSource,
+        url: source.url,
+        inlineHtml: source.inlineHtml,
+        baseUrl: document.baseURI || window.location.href,
+        visualWidth: Math.round(rect.width),
+        visualHeight: Math.round(rect.height),
+        isVisible: getTargetVisibility(element, rect),
+        sandbox: sandbox,
+        canAccessDocument: canAccessDocument,
+        sameOrigin: sameOrigin,
+        recommendedAction: recommendedAction,
+        reason: reason,
+        element: element
+      };
+    }
+
+    function scanCaptureTargets() {
+      const candidates = Array.prototype.slice
+        .call(document.querySelectorAll('iframe, object[type]'))
+        .filter(function (element) {
+          return (
+            element.tagName.toLowerCase() === 'iframe' ||
+            (element.getAttribute('type') || '').trim().toLowerCase() ===
+              'text/html'
+          );
+        });
+
+      return candidates
+        .map(classifyCaptureTarget)
+        .sort(function (left, right) {
+          function priority(target) {
+            const hiddenPenalty = target.isVisible ? 0 : 2;
+            const blockedPenalty =
+              target.recommendedAction === 'blocked' ? 1 : 0;
+
+            return hiddenPenalty + blockedPenalty;
+          }
+
+          return priority(left) - priority(right) || left.index - right.index;
+        });
+    }
+
+    function getCaptureTargetLabel(info) {
       return (
         info.title ||
         info.name ||
-        getHostname(info.src) ||
-        `Iframe ${info.index + 1}`
+        getHostname(info.url) ||
+        `${info.kind === 'iframe' ? 'Iframe' : 'Object HTML'} ${info.index + 1}`
       );
     }
 
-    function getIframeExpectedSize(info, iframeWindow) {
+    function getCaptureTargetExpectedSize(info) {
+      const embeddedDocument = getAccessibleEmbeddedDocument(info.element);
+
       try {
+        const embeddedWindow = embeddedDocument && embeddedDocument.defaultView;
+
         return {
-          width: iframeWindow.innerWidth || info.visualWidth,
-          height: iframeWindow.innerHeight || info.visualHeight
+          width:
+            (embeddedWindow && embeddedWindow.innerWidth) ||
+            (info.visualWidth > 1 ? info.visualWidth : 800),
+          height:
+            (embeddedWindow && embeddedWindow.innerHeight) ||
+            (info.visualHeight > 1 ? info.visualHeight : 600)
         };
       } catch (error) {
         return {
-          width: info.visualWidth,
-          height: info.visualHeight
+          width: info.visualWidth > 1 ? info.visualWidth : 800,
+          height: info.visualHeight > 1 ? info.visualHeight : 600
         };
       }
     }
@@ -334,18 +488,51 @@
       win.__h2dMetricOverridesApplied = true;
     }
 
+    function setCaptureHashWithoutNavigation(win) {
+      const originalUrl = win.location.href;
+      const originalState = win.history.state;
+      const originalTitle = win.document.title;
+      const captureUrl = `${originalUrl.replace(/#.*$/, '')}#${CAPTURE_HASH}`;
+
+      try {
+        win.history.replaceState(
+          originalState,
+          originalTitle,
+          captureUrl
+        );
+
+        return function restoreCaptureUrl() {
+          try {
+            win.history.replaceState(originalState, originalTitle, originalUrl);
+          } catch (error) {
+            win.console.warn(
+              '[html.to.design dimension picker] No se pudo restaurar la URL tras preparar capture.js.',
+              error
+            );
+          }
+        };
+      } catch (error) {
+        win.console.warn(
+          '[html.to.design dimension picker] History API no disponible; se usa location.hash como fallback y la SPA podría reaccionar.',
+          error
+        );
+        win.location.hash = CAPTURE_HASH;
+        return null;
+      }
+    }
+
     function injectCapture(targetWindow, expectedSize) {
       const win = targetWindow || window;
       const doc = win.document;
 
       if (!isTopLevelWindow(win)) {
         win.console.warn(
-          '[html.to.design dimension picker] Captura cancelada: capture.js puede quedarse cargando dentro de iframes. Abre el iframe como ventana superior.'
+          '[html.to.design dimension picker] Captura cancelada: capture.js puede quedarse cargando dentro de documentos embebidos. Abre el target como ventana superior.'
         );
         return;
       }
   
-      function appendCaptureScript() {
+      function appendCaptureScript(onSettled) {
         logCaptureDiagnostics(win, expectedSize, 'Capture diagnostics before capture.js');
 
         if (ENABLE_CAPTURE_METRIC_OVERRIDES) {
@@ -355,39 +542,181 @@
         const script = doc.createElement('script');
         script.src = CAPTURE_SCRIPT_URL;
         script.async = true;
+
+        if (onSettled) {
+          script.addEventListener('load', onSettled, { once: true });
+          script.addEventListener('error', onSettled, { once: true });
+        }
+
         doc.head.appendChild(script);
       }
   
       appendCaptureScript();
   
       win.setTimeout(function () {
-        win.location.hash = 'figmacapture&figmadelay=1000';
-        appendCaptureScript();
+        const restoreCaptureUrl = setCaptureHashWithoutNavigation(win);
+        appendCaptureScript(restoreCaptureUrl);
       }, 500);
     }
 
-    function openUrlSizedCapture(url, width, height) {
-      const captureWindow = window.open(
-        url,
-        `h2d-iframe-capture-${Date.now()}`,
-        [
-          `width=${width}`,
-          `height=${height}`,
-          'left=0',
-          'top=0',
-          'resizable=yes',
-          'scrollbars=yes',
-          'noopener=no'
-        ].join(',')
+    function preserveDynamicSnapshotState(sourceRoot, clonedRoot) {
+      const sourceFields = sourceRoot.querySelectorAll(
+        'input, textarea, option, details'
+      );
+      const clonedFields = clonedRoot.querySelectorAll(
+        'input, textarea, option, details'
       );
 
-      if (!captureWindow) {
-        window.alert(
-          'El navegador ha bloqueado la ventana de captura. Abre el iframe en una nueva ventana y lanza allí el bookmarklet.'
+      sourceFields.forEach(function (sourceField, index) {
+        const clonedField = clonedFields[index];
+
+        if (!clonedField) {
+          return;
+        }
+
+        if (sourceField.tagName === 'INPUT') {
+          clonedField.setAttribute('value', sourceField.value || '');
+
+          if (sourceField.checked) {
+            clonedField.setAttribute('checked', '');
+          } else {
+            clonedField.removeAttribute('checked');
+          }
+        } else if (sourceField.tagName === 'TEXTAREA') {
+          clonedField.textContent = sourceField.value || '';
+        } else if (sourceField.tagName === 'OPTION') {
+          if (sourceField.selected) {
+            clonedField.setAttribute('selected', '');
+          } else {
+            clonedField.removeAttribute('selected');
+          }
+        } else if (sourceField.tagName === 'DETAILS') {
+          if (sourceField.open) {
+            clonedField.setAttribute('open', '');
+          } else {
+            clonedField.removeAttribute('open');
+          }
+        }
+      });
+
+      const sourceCanvases = sourceRoot.querySelectorAll('canvas');
+      const clonedCanvases = clonedRoot.querySelectorAll('canvas');
+
+      sourceCanvases.forEach(function (sourceCanvas, index) {
+        const clonedCanvas = clonedCanvases[index];
+
+        if (!clonedCanvas) {
+          return;
+        }
+
+        try {
+          const image = clonedCanvas.ownerDocument.createElement('img');
+          image.src = sourceCanvas.toDataURL();
+          image.className = clonedCanvas.className;
+          image.setAttribute('style', clonedCanvas.getAttribute('style') || '');
+          image.width = sourceCanvas.width;
+          image.height = sourceCanvas.height;
+          clonedCanvas.replaceWith(image);
+        } catch (error) {
+          // A canvas con recursos cross-origin no se puede serializar con toDataURL.
+        }
+      });
+    }
+
+    function getSnapshotBaseUrl(info, sourceDocument) {
+      const baseElement = sourceDocument.querySelector('base[href]');
+
+      if (baseElement) {
+        const resolvedBase = getAbsoluteUrl(
+          baseElement.getAttribute('href') || '',
+          info.baseUrl
         );
-        return;
+
+        if (isHttpUrl(resolvedBase)) {
+          return resolvedBase;
+        }
       }
 
+      if (isHttpUrl(sourceDocument.baseURI)) {
+        return sourceDocument.baseURI;
+      }
+
+      return info.baseUrl;
+    }
+
+    function sanitizeSnapshotDocument(sourceDocument, info) {
+      const clonedRoot = sourceDocument.documentElement.cloneNode(true);
+      const baseUrl = getSnapshotBaseUrl(info, sourceDocument);
+
+      preserveDynamicSnapshotState(sourceDocument.documentElement, clonedRoot);
+
+      clonedRoot
+        .querySelectorAll(
+          'script, iframe, object, embed, meta[http-equiv="refresh" i], meta[http-equiv="content-security-policy" i], link[rel="modulepreload" i], link[rel="preload" i], link[rel="prefetch" i]'
+        )
+        .forEach(function (node) {
+          node.remove();
+        });
+
+      clonedRoot.querySelectorAll('*').forEach(function (node) {
+        Array.prototype.slice.call(node.attributes).forEach(function (attribute) {
+          const attributeName = attribute.name.toLowerCase();
+          const attributeValue = (attribute.value || '').trim();
+
+          if (
+            attributeName.indexOf('on') === 0 ||
+            ((attributeName === 'href' ||
+              attributeName === 'xlink:href' ||
+              attributeName === 'action' ||
+              attributeName === 'formaction') &&
+              /^javascript:/i.test(attributeValue))
+          ) {
+            node.removeAttribute(attribute.name);
+          }
+        });
+      });
+
+      clonedRoot.querySelectorAll('base').forEach(function (node) {
+        node.remove();
+      });
+
+      let head = clonedRoot.querySelector('head');
+
+      if (!head) {
+        head = clonedRoot.ownerDocument.createElement('head');
+        clonedRoot.insertBefore(head, clonedRoot.firstChild);
+      }
+
+      const base = clonedRoot.ownerDocument.createElement('base');
+      base.href = baseUrl;
+      head.insertBefore(base, head.firstChild);
+
+      const marker = clonedRoot.ownerDocument.createElement('meta');
+      marker.name = 'h2d-snapshot-mode';
+      marker.content = 'static-sanitized';
+      head.insertBefore(marker, base.nextSibling);
+
+      return `<!doctype html>\n${clonedRoot.outerHTML}`;
+    }
+
+    function createInlineSnapshot(info) {
+      let sourceDocument = getAccessibleEmbeddedDocument(info.element);
+
+      if (!sourceDocument && info.inlineHtml) {
+        sourceDocument = new window.DOMParser().parseFromString(
+          info.inlineHtml,
+          'text/html'
+        );
+      }
+
+      if (!sourceDocument || !sourceDocument.documentElement) {
+        return '';
+      }
+
+      return sanitizeSnapshotDocument(sourceDocument, info);
+    }
+
+    function waitForCaptureWindow(captureWindow, width, height, messages) {
       let attempts = 0;
       const maxAttempts = 40;
 
@@ -410,18 +739,88 @@
           }
         } catch (error) {
           window.clearInterval(interval);
-          window.alert(
-            'El iframe se abrió, pero ya no es accesible para captura automática. Lanza el bookmarklet manualmente en esa ventana si la página lo permite.'
-          );
+          window.alert(messages.inaccessible);
         }
 
         if (attempts >= maxAttempts) {
           window.clearInterval(interval);
-          window.alert(
-            'El iframe está tardando demasiado en cargar. Lanza el bookmarklet manualmente en la ventana abierta cuando termine.'
-          );
+          window.alert(messages.timeout);
         }
       }, 250);
+    }
+
+    function openUrlSizedCapture(url, width, height) {
+      const captureWindow = window.open(
+        url,
+        `h2d-target-capture-${Date.now()}`,
+        [
+          `width=${width}`,
+          `height=${height}`,
+          'left=0',
+          'top=0',
+          'resizable=yes',
+          'scrollbars=yes',
+          'noopener=no'
+        ].join(',')
+      );
+
+      if (!captureWindow) {
+        window.alert(
+          'El navegador ha bloqueado la ventana de captura. Abre el documento en una nueva ventana y lanza allí el bookmarklet.'
+        );
+        return;
+      }
+
+      waitForCaptureWindow(captureWindow, width, height, {
+        inaccessible:
+          'El documento se abrió, pero ya no es accesible para captura automática. Lanza el bookmarklet manualmente en esa ventana si la página lo permite.',
+        timeout:
+          'El documento está tardando demasiado en cargar. Lanza el bookmarklet manualmente en la ventana abierta cuando termine.'
+      });
+    }
+
+    function openInlineSizedCapture(snapshotHtml, width, height) {
+      const snapshotUrl = window.URL.createObjectURL(
+        new window.Blob([snapshotHtml], { type: 'text/html;charset=utf-8' })
+      );
+      const captureWindow = window.open(
+        snapshotUrl,
+        `h2d-inline-capture-${Date.now()}`,
+        [
+          `width=${width}`,
+          `height=${height}`,
+          'left=0',
+          'top=0',
+          'resizable=yes',
+          'scrollbars=yes',
+          'noopener=no'
+        ].join(',')
+      );
+
+      if (!captureWindow) {
+        window.URL.revokeObjectURL(snapshotUrl);
+        window.alert(
+          'El navegador ha bloqueado la ventana del snapshot. Permite popups y vuelve a intentarlo.'
+        );
+        return;
+      }
+
+      captureWindow.addEventListener(
+        'load',
+        function () {
+          window.setTimeout(function () {
+            window.URL.revokeObjectURL(snapshotUrl);
+          }, 60000);
+        },
+        { once: true }
+      );
+
+      waitForCaptureWindow(captureWindow, width, height, {
+        inaccessible:
+          'El snapshot se abrió, pero dejó de ser accesible para la captura automática.',
+        timeout:
+          'El snapshot está tardando demasiado en cargar sus recursos visuales.'
+      });
     }
   
     function openSizedCapture(width, height) {
@@ -492,33 +891,46 @@
       host.style.zIndex = '2147483647';
   
       const shadow = host.attachShadow({ mode: 'open' });
-      const iframeScan = scanIframes();
+      const captureTargets = scanCaptureTargets();
+      const visibleTargets = captureTargets.filter(function (info) {
+        return info.isVisible;
+      });
+      const technicalTargets = captureTargets.filter(function (info) {
+        return !info.isVisible;
+      });
 
-      function getIframeStatusLabel(info) {
-        if (info.recommendedAction === 'capture-direct') {
-          return 'Capturable en ventana';
+      function getCaptureTargetStatusLabel(info) {
+        if (info.recommendedAction === 'capture-url') {
+          return 'Capturable por URL';
         }
 
-        if (info.recommendedAction === 'open-src') {
+        if (info.recommendedAction === 'capture-inline') {
+          return 'Snapshot capturable';
+        }
+
+        if (info.recommendedAction === 'open-url') {
           return 'Abrir en nueva ventana';
         }
 
         return 'Bloqueado';
       }
 
-      function renderIframeAction(info) {
-        if (info.recommendedAction === 'capture-direct') {
+      function renderCaptureTargetAction(info) {
+        if (
+          info.recommendedAction === 'capture-url' ||
+          info.recommendedAction === 'capture-inline'
+        ) {
           return `
-            <button class="iframe-action" type="button" data-iframe-action="capture" data-iframe-index="${info.index}">
-              Capturar iframe
+            <button class="target-action" type="button" data-target-action="capture" data-target-id="${info.id}">
+              Capturar contenido
             </button>
           `;
         }
 
-        if (info.recommendedAction === 'open-src') {
+        if (info.recommendedAction === 'open-url') {
           return `
-            <button class="iframe-action" type="button" data-iframe-action="open" data-iframe-index="${info.index}">
-              Abrir iframe
+            <button class="target-action" type="button" data-target-action="open" data-target-id="${info.id}">
+              Abrir documento
             </button>
           `;
         }
@@ -526,38 +938,59 @@
         return '';
       }
 
-      function renderIframeInfo(info) {
-        const label = getIframeLabel(info);
+      function renderCaptureTargetInfo(info) {
+        const label = getCaptureTargetLabel(info);
         const sandboxLabel = info.sandbox
           ? ` · sandbox: ${info.sandbox}`
           : '';
+        const kindLabel = info.kind === 'iframe' ? 'iframe' : 'object HTML';
+        const sourceLabel =
+          info.sourceMode === 'srcdoc'
+            ? 'srcdoc'
+            : info.sourceMode === 'inline-html'
+              ? 'HTML inline'
+              : info.sourceMode === 'url'
+                ? 'URL'
+                : 'sin fuente útil';
 
         return `
-          <article class="iframe-item">
-            <div class="iframe-topline">
+          <article class="target-item">
+            <div class="target-topline">
               <strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong>
-              <span>${escapeHtml(getIframeStatusLabel(info))}</span>
+              <span>${escapeHtml(getCaptureTargetStatusLabel(info))}</span>
             </div>
-            <div class="iframe-meta">
-              ${info.visualWidth} × ${info.visualHeight}${escapeHtml(sandboxLabel)}
+            <div class="target-meta">
+              ${escapeHtml(kindLabel)} · ${escapeHtml(sourceLabel)} · ${info.visualWidth} × ${info.visualHeight}${escapeHtml(sandboxLabel)}
             </div>
-            <div class="iframe-reason">${escapeHtml(info.reason)}</div>
-            ${renderIframeAction(info)}
+            <div class="target-reason">${escapeHtml(info.reason)}</div>
+            ${renderCaptureTargetAction(info)}
           </article>
         `;
       }
 
-      function renderIframeSection() {
-        if (!iframeScan.length) {
+      function renderCaptureTargetSection() {
+        if (!captureTargets.length) {
           return '';
         }
 
         return `
-          <section class="iframe-section" aria-labelledby="h2d-iframes-title">
-            <h3 id="h2d-iframes-title">Iframes detectados</h3>
-            <div class="iframe-list">
-              ${iframeScan.map(renderIframeInfo).join('')}
+          <section class="target-section" aria-labelledby="h2d-targets-title">
+            <h3 id="h2d-targets-title">Contenido embebido</h3>
+            <div class="target-list">
+              ${visibleTargets.map(renderCaptureTargetInfo).join('')}
             </div>
+            ${
+              technicalTargets.length
+                ? `
+                  <details class="technical-targets">
+                    <summary>${technicalTargets.length} elemento${technicalTargets.length === 1 ? '' : 's'} oculto${technicalTargets.length === 1 ? '' : 's'} o técnico${technicalTargets.length === 1 ? '' : 's'}</summary>
+                    <div class="target-list target-list-technical">
+                      ${technicalTargets.map(renderCaptureTargetInfo).join('')}
+                    </div>
+                  </details>
+                `
+                : ''
+            }
           </section>
         `;
       }
@@ -820,14 +1253,14 @@
             border-color: rgba(148, 163, 184, 0.32);
           }
 
-          .iframe-section {
+          .target-section {
             position: relative;
             margin-top: 16px;
             padding-top: 12px;
             border-top: 1px solid rgba(148, 163, 184, 0.22);
           }
 
-          .iframe-list {
+          .target-list {
             display: grid;
             gap: 8px;
             max-height: 178px;
@@ -835,7 +1268,7 @@
             padding-right: 2px;
           }
 
-          .iframe-item {
+          .target-item {
             padding: 10px;
             color: #334155;
             background: rgba(255, 255, 255, 0.38);
@@ -843,7 +1276,7 @@
             border-radius: 14px;
           }
 
-          .iframe-topline {
+          .target-topline {
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -853,29 +1286,29 @@
             line-height: 16px;
           }
 
-          .iframe-topline strong {
+          .target-topline strong {
             min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
           }
 
-          .iframe-topline span {
+          .target-topline span {
             flex: 0 0 auto;
             color: #475569;
             font-size: 11px;
             font-weight: 650;
           }
 
-          .iframe-meta,
-          .iframe-reason {
+          .target-meta,
+          .target-reason {
             margin-top: 4px;
             color: #64748b;
             font-size: 11px;
             line-height: 15px;
           }
 
-          .iframe-action {
+          .target-action {
             width: 100%;
             min-height: 32px;
             margin-top: 8px;
@@ -891,11 +1324,26 @@
             font-weight: 650;
           }
 
-          .iframe-action:hover {
+          .target-action:hover {
             border-color: rgba(148, 163, 184, 0.32);
             background:
               linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
               rgba(255, 255, 255, 0.5);
+          }
+
+          .technical-targets {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 15px;
+          }
+
+          .technical-targets summary {
+            cursor: pointer;
+          }
+
+          .target-list-technical {
+            margin-top: 8px;
           }
   
           .hint {
@@ -950,7 +1398,7 @@
             </button>
           </div>
 
-          ${renderIframeSection()}
+          ${renderCaptureTargetSection()}
   
           <div class="hint">
             Si eliges otro tamaño, se abrirá una ventana de captura con ese viewport.
@@ -965,7 +1413,7 @@
       const heightInput = shadow.getElementById('height');
       const captureButton = shadow.querySelector('[data-action="capture"]');
       const closeButtons = shadow.querySelectorAll('[data-action="close"]');
-      const iframeButtons = shadow.querySelectorAll('[data-iframe-action]');
+      const targetButtons = shadow.querySelectorAll('[data-target-action]');
   
       function closePanel() {
         host.remove();
@@ -1011,61 +1459,71 @@
         openSizedCapture(width, height);
       }
 
-      function getIframeInfoFromButton(button) {
-        const iframeIndex = Number(button.getAttribute('data-iframe-index'));
+      function getCaptureTargetFromButton(button) {
+        const targetId = button.getAttribute('data-target-id');
 
-        return iframeScan.find(function (info) {
-          return info.index === iframeIndex;
+        return captureTargets.find(function (info) {
+          return info.id === targetId;
         });
       }
 
-      function captureIframe(info) {
-        const iframeWindow = getAccessibleIframeWindow(info.element);
+      function captureEmbeddedTarget(info) {
+        const expectedSize = getCaptureTargetExpectedSize(info);
 
-        if (!iframeWindow) {
-          window.alert(
-            'Este iframe ya no es accesible desde el bookmarklet. Puede estar bloqueado por Same-Origin Policy o sandbox.'
+        if (info.recommendedAction === 'capture-url') {
+          closePanel();
+          openUrlSizedCapture(
+            info.url,
+            expectedSize.width,
+            expectedSize.height
           );
           return;
         }
 
-        if (!isOpenableIframeSrc(info.src)) {
-          window.alert(
-            'Este iframe no tiene una URL propia adecuada. Capturarlo dentro del iframe puede quedarse cargando indefinidamente.'
-          );
-          return;
-        }
+        if (info.recommendedAction === 'capture-inline') {
+          const snapshotHtml = createInlineSnapshot(info);
 
-        closePanel();
-        const expectedSize = getIframeExpectedSize(info, iframeWindow);
-        openUrlSizedCapture(info.src, expectedSize.width, expectedSize.height);
+          if (!snapshotHtml) {
+            window.alert(
+              'El contenido inline ya no está disponible para reconstruir el snapshot.'
+            );
+            return;
+          }
+
+          closePanel();
+          openInlineSizedCapture(
+            snapshotHtml,
+            expectedSize.width,
+            expectedSize.height
+          );
+        }
       }
 
-      function openIframe(info) {
-        const openedWindow = window.open(info.src, '_blank', 'noopener,noreferrer');
+      function openEmbeddedTarget(info) {
+        const openedWindow = window.open(info.url, '_blank', 'noopener,noreferrer');
 
         if (!openedWindow) {
           window.alert(
-            'El navegador ha bloqueado la nueva ventana. Abre manualmente la URL del iframe si está disponible.'
+            'El navegador ha bloqueado la nueva ventana. Abre manualmente la URL del documento si está disponible.'
           );
         }
       }
 
-      function handleIframeAction(event) {
+      function handleCaptureTargetAction(event) {
         const button = event.currentTarget;
-        const info = getIframeInfoFromButton(button);
+        const info = getCaptureTargetFromButton(button);
 
         if (!info) {
           return;
         }
 
-        if (button.getAttribute('data-iframe-action') === 'capture') {
-          captureIframe(info);
+        if (button.getAttribute('data-target-action') === 'capture') {
+          captureEmbeddedTarget(info);
           return;
         }
 
-        if (button.getAttribute('data-iframe-action') === 'open') {
-          openIframe(info);
+        if (button.getAttribute('data-target-action') === 'open') {
+          openEmbeddedTarget(info);
         }
       }
   
@@ -1082,8 +1540,8 @@
         button.addEventListener('click', closePanel);
       });
 
-      iframeButtons.forEach(function (button) {
-        button.addEventListener('click', handleIframeAction);
+      targetButtons.forEach(function (button) {
+        button.addEventListener('click', handleCaptureTargetAction);
       });
   
       document.addEventListener('keydown', handleEscape);

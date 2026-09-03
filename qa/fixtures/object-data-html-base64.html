@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Object data HTML base64</title>
+    <style>
+      body { margin: 32px; font-family: system-ui, sans-serif; background: #fefce8; }
+      object { width: 560px; height: 300px; border: 3px solid #0f766e; border-radius: 16px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Padre amarillo</h1>
+      <object id="base64-object" type="text/html" title="Tarjeta inline base64"></object>
+    </main>
+
+    <script>
+      const inlineHtml = `<!doctype html>
+        <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <title>Documento inline base64</title>
+            <style>
+              body { margin: 0; padding: 32px; font-family: system-ui, sans-serif; color: #134e4a; background: #ccfbf1; }
+              main { padding: 30px; background: white; border-radius: 22px; }
+              h1 { margin-top: 0; }
+            </style>
+          </head>
+          <body>
+            <main data-qa-content="base64-inline">
+              <h1>Documento base64 verde</h1>
+              <p>El contenido UTF-8 —incluida la ñ— debe decodificarse sin corrupción.</p>
+            </main>
+          </body>
+        </html>`;
+      const bytes = new TextEncoder().encode(inlineHtml);
+      let binary = '';
+
+      bytes.forEach(function (byte) {
+        binary += String.fromCharCode(byte);
+      });
+
+      document
+        .getElementById('base64-object')
+        .setAttribute('data', `data:text/html;charset=utf-8;base64,${btoa(binary)}`);
+    </script>
+  </body>
+</html>

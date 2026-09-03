@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - SPA sensible al hash</title>
+    <style>
+      body { margin: 32px; font-family: system-ui, sans-serif; background: #f8fafc; }
+      #app { max-width: 620px; padding: 28px; border: 2px solid #0284c7; border-radius: 20px; background: white; }
+      #route-status { font-family: ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <h1>Ruta SPA estable</h1>
+      <p id="route-status">Sin navegación por hash</p>
+    </main>
+
+    <script>
+      window.__qaHashState = {
+        hashchangeCount: 0,
+        initialContent: document.getElementById('app').innerHTML
+      };
+
+      window.addEventListener('hashchange', function () {
+        window.__qaHashState.hashchangeCount += 1;
+        document.getElementById('app').innerHTML = `
+          <h1>Ruta modificada</h1>
+          <p id="route-status">hashchange: ${window.location.hash}</p>
+        `;
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Object cross-origin</title>
+    <style>
+      body { margin: 32px; font-family: system-ui, sans-serif; }
+      object { width: 560px; height: 260px; border: 3px solid #b45309; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Padre con object cross-origin</h1>
+      <object
+        type="text/html"
+        title="Object externo"
+        data="https://example.com"
+      >
+        El recurso externo no está disponible.
+      </object>
+    </main>
+  </body>
+</html>

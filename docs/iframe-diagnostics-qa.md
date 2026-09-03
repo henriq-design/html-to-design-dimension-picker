@@ -1,65 +1,72 @@
-# Iframe diagnostics QA
+# Embedded documents diagnostics QA
+
+Este archivo conserva la ruta histórica de QA de iframe, ampliada al modelo común de documentos HTML embebidos.
 
 ## Matriz
 
 | Caso probado | Resultado esperado | Resultado observado | Estado | Notas |
 | --- | --- | --- | --- | --- |
-| `no-iframes.html` | El panel abre y no muestra `Iframes detectados`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Probar en Chrome con el bookmarklet actualizado. |
-| `same-origin-iframe-parent.html` | El iframe aparece como `Capturable en ventana` y muestra `Capturar iframe`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Al pulsar `Capturar iframe`, debe abrir la URL del iframe en una ventana dedicada y capturarla como top-level. |
-| `srcdoc-iframe.html` | No muestra `Capturar iframe` porque no tiene URL propia `http/https`; debe quedar bloqueado con motivo claro. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | Evita la carga infinita de `capture.js` dentro del subframe. |
-| `sandboxed-iframe.html` | No se captura a ciegas; aparece bloqueado o sin accion de captura. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | El fixture usa `sandbox` sin permisos. |
-| `cross-origin-iframe.html` | No aparece como capturable; si tiene `https://example.com`, muestra `Abrir iframe`. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | La carga externa puede depender de red, pero la clasificacion no debe ofrecer captura directa. |
-| `iframe-without-src.html` | No muestra una accion inutil de captura o apertura. | No ejecutado en navegador real; el navegador integrado bloqueo la ejecucion de URLs `javascript:` como bookmarklet. | pending | El iframe esta vacio y sin URL propia. |
-| URLs no razonables (`about:blank`, `data:`, `blob:`, `javascript:`) | No deben mostrar `Abrir iframe`; solo `http/https` son abribles. | Auditoria estatica: `isOpenableIframeSrc()` solo acepta `http:` y `https:`. | pass | Pendiente confirmar visualmente en Chrome si se anaden fixtures especificos. |
-| Iframe sandboxed accesible sin `allow-scripts` | No debe mostrar `Capturar iframe`. | Auditoria estatica: si hay `sandbox` accesible sin `allow-scripts`, queda bloqueado. | pass | Evita inyectar `capture.js` donde el sandbox no ejecutaria scripts. |
-| Regresion carga infinita en subframes | `capture.js` no debe inyectarse dentro de `iframe.contentWindow`. | Auditoria estatica: `captureIframe()` abre una ventana dedicada y `injectCapture()` cancela si recibe un subframe. | pass | Cambio aplicado tras observar `Capturing page for clipboard` infinito dentro de iframe. |
-| Regresion toolbar html.to.design | No existen estilos ni funciones propias sobre la toolbar de `capture.js`. | Busqueda estatica sin coincidencias. | pass | Validado con `rg` sobre fuente y outputs generados. |
-| Build del bookmarklet | `marcador-codigoJS` y `dist/bookmarklet.min.js` se generan y coinciden. | `node scripts/build-bookmarklet.cjs` y `cmp` pasan. | pass | Ejecutado durante auditoria. |
+| `no-iframes.html` | El panel abre y no muestra `Contenido embebido`. | Chromium: sección ausente; captura actual y popup 1440 × 900 conservan la página correcta. | pass | La ausencia de targets no altera los dos flujos de página actual. |
+| `same-origin-iframe-parent.html` | Muestra `iframe · URL`, `Capturable por URL` y `Capturar contenido`. | Chromium: clasificación correcta; popup final en `same-origin-iframe-child.html`. | pass | El stub recibió primero hash vacío y después `#figmacapture&figmadelay=1000`. |
+| `srcdoc-iframe.html` | Muestra `iframe · srcdoc` y `Snapshot capturable`. | Chromium: snapshot blob top-level conservó heading e input mutados en el DOM. | pass | `window.__srcdocApplicationExecuted` no existía en el snapshot: el script no se reejecutó. |
+| `sandboxed-iframe.html` | Muestra un snapshot estático capturable sin ejecutar scripts del contenido. | Chromium: popup blob con marcador `static-sanitized` y contenido sandboxed correcto. | pass | Se reconstruyó desde el `srcdoc` original, sin inyección en el subframe. |
+| `cross-origin-iframe.html` | Muestra `Abrir documento`, nunca captura directa. | Chromium: `iframe · URL`, estado de apertura y ningún botón de captura. | pass | La carga externa puede fallar sin alterar la clasificación. |
+| `iframe-without-src.html` | Queda bloqueado sin acción inútil. | Chromium: estado `Bloqueado`, `sin fuente útil` y sin botón. | pass | `about:blank` vacío no es un target útil. |
+| `object-data-html.html` | Prioriza el `object HTML · HTML inline`; el iframe de 1 px queda en el grupo técnico. | Chromium: object visible primero; iframe técnico plegado; popup muestra la tarjeta azul, no el padre. | pass | El SVG relativo cargó con `naturalWidth = 160`; el script inline no se reejecutó. |
+| `object-data-html-base64.html` | Decodifica UTF-8 base64 y ofrece snapshot. | Chromium: popup conservó raya larga y `ñ`, con ambos hashes observados por el stub. | pass | Decodificación y estrategia inline comunes. |
+| `object-same-origin-parent.html` | Clasifica el object como capturable por URL y abre el hijo top-level. | Chromium: popup final en `object-same-origin-child.html` con marcador `same-origin-object`. | pass | Conserva la estrategia histórica por URL. |
+| `object-cross-origin.html` | Ofrece solo apertura fallback. | Chromium: estado `Abrir en nueva ventana` y botón `Abrir documento`, sin captura. | pass | Same-Origin Policy impide automatizar la captura. |
+| `spa-hash-sensitive.html` | Iniciar captura no dispara `hashchange`, no cambia el contenido y restaura la URL. | Chromium: `hashchangeCount = 0`, contenido intacto y URL final igual a la inicial. | pass | El stub confirmó que la segunda ejecución ve el hash requerido. |
+| Objetos no HTML | No aparecen en la lista de targets. | Auditoría estática: el selector filtra `object[type]` por valor exacto `text/html`. | pass | PDF, imagen y SVG quedan fuera. |
+| `data:text/html` percent/base64 | Ambos formatos se decodifican mediante la misma función. | Auditoría estática sobre `decodeDataHtmlUrl()`. | pass | Un payload inválido queda bloqueado. |
+| Regresión de carga infinita en subframes | `capture.js` no se inyecta dentro de `contentWindow` de un target. | Auditoría estática: `injectCapture()` exige top-level; las dos estrategias abren ventana dedicada. | pass | No existe handler separado de iframe/object. |
+| Regresión toolbar html.to.design | No existen estilos ni funciones propias sobre la toolbar de `capture.js`. | Chromium con `capture.js` real: toolbar oscura original, controles visibles y captura a portapapeles operativa. | pass | Sin estilos propios; `ENABLE_CAPTURE_METRIC_OVERRIDES = false`. |
+| Build del bookmarklet | Fuente válida y outputs generados idénticos. | `node --check`, build, `cmp` y `git diff --check` terminaron correctamente. | pass | Ejecutado el 3 de septiembre de 2026. |
 
-## Validaciones tecnicas ejecutadas
+## QA por HTTP
+
+Los fixtures deben servirse desde la raíz del repositorio, nunca mediante `file://`:
+
+```bash
+python3 -m http.server 8080 --bind 127.0.0.1
+```
+
+Rutas principales:
+
+```text
+http://127.0.0.1:8080/qa/fixtures/object-data-html.html
+http://127.0.0.1:8080/qa/fixtures/object-data-html-base64.html
+http://127.0.0.1:8080/qa/fixtures/object-same-origin-parent.html
+http://127.0.0.1:8080/qa/fixtures/object-cross-origin.html
+http://127.0.0.1:8080/qa/fixtures/srcdoc-iframe.html
+http://127.0.0.1:8080/qa/fixtures/spa-hash-sensitive.html
+```
+
+Las comprobaciones automatizadas sustituyeron inicialmente la respuesta de `capture.js` por un stub local para observar el contexto top-level, el hash visible al ejecutar el script y la restauración de URL. Después se repitieron los flujos principales con el `capture.js` externo real y permisos de portapapeles en el origen local.
+
+## QA manual con `capture.js` real
+
+Ejecutado en Chromium headed el 3 de septiembre de 2026:
+
+- `spa-hash-sensitive.html`: apareció la toolbar original con `Copiar al portapapeles`, `Pantalla completa` y `Seleccionar elemento`; `hashchangeCount` permaneció en `0`, el contenido no cambió y la URL final se restauró. El portapapeles recibió un item `text/html` de 6683 bytes.
+- `object-data-html.html`: el popup top-level mostró la tarjeta azul y el recurso SVG; el portapapeles recibió `text/html` de 12439 bytes. El payload `figh2d` decodificado tenía título `Documento inline percent-encoded`, root `HTML` de 626 px, contenía `Documento embebido azul` y no contenía `Página padre rosa`. El script inline no se reejecutó.
+- `srcdoc-iframe.html`: tras mutar heading e input dentro del iframe, el popup y el payload real conservaron `Contenido srcdoc mutado real` y `Estado real mutado`; no apareció el texto del padre ni se reejecutó el script original. El payload decodificado tenía 6255 bytes.
+
+No se observaron warnings ni errores de `capture.js` en los popups inline. El único error visto en la SPA fue el `404` irrelevante de `favicon.ico` del servidor estático.
+
+## Validaciones técnicas ejecutadas
 
 ```bash
 node --check src/bookmarklet.js
 node scripts/build-bookmarklet.cjs
 cmp marcador-codigoJS dist/bookmarklet.min.js
-rg -n "installCaptureToolbarStyles|findToolbarRoot|applyToolbarClass|h2d-capture-toolbar" src/bookmarklet.js marcador-codigoJS dist/bookmarklet.min.js
+git diff --check
 ```
 
-Resultado:
+También se verificó mediante búsquedas estáticas que:
 
-- `node --check` paso.
-- `node scripts/build-bookmarklet.cjs` genero `dist/bookmarklet.min.js` y `marcador-codigoJS`.
-- `cmp` paso sin diferencias.
-- `rg` no encontro coincidencias para los estilos/funciones prohibidas de la toolbar.
-
-## QA en navegador integrado
-
-Se levanto un servidor local con:
-
-```bash
-python3 -m http.server 8080
-```
-
-El intento de ejecutar el bookmarklet como URL `javascript:` en el navegador integrado fue bloqueado por la politica de seguridad del navegador de pruebas. Por eso los casos visuales quedan como `pending` y deben validarse manualmente en Chrome.
-
-## Instrucciones de QA manual en Chrome
-
-1. Ejecutar desde la raiz del repo:
-
-   ```bash
-   python3 -m http.server 8080
-   ```
-
-2. Actualizar el bookmarklet guardado con el contenido de `marcador-codigoJS`.
-3. Abrir cada fixture:
-   - `http://127.0.0.1:8080/qa/fixtures/no-iframes.html`
-   - `http://127.0.0.1:8080/qa/fixtures/same-origin-iframe-parent.html`
-   - `http://127.0.0.1:8080/qa/fixtures/srcdoc-iframe.html`
-   - `http://127.0.0.1:8080/qa/fixtures/sandboxed-iframe.html`
-   - `http://127.0.0.1:8080/qa/fixtures/cross-origin-iframe.html`
-   - `http://127.0.0.1:8080/qa/fixtures/iframe-without-src.html`
-4. Lanzar el bookmarklet en cada pagina.
-5. Confirmar visualmente los resultados esperados de la tabla.
-6. En el fixture same-origin, pulsar `Capturar iframe` y confirmar que se abre una ventana dedicada con el contenido del iframe.
-7. En el fixture cross-origin, pulsar `Abrir iframe` y confirmar que se abre una nueva pestana o ventana con `https://example.com`.
-8. Confirmar que la toolbar de html.to.design conserva su UI original cuando aparezca.
+- no existen `installCaptureToolbarStyles`, `findToolbarRoot`, `applyToolbarClass`, `h2d-capture-toolbar` ni `exposeCaptureShadowRoots`;
+- `ENABLE_CAPTURE_METRIC_OVERRIDES = false`;
+- solo existe `scanCaptureTargets()` como escáner de documentos embebidos;
+- no hay una llamada a `injectCapture()` con `contentWindow`, `contentDocument` o una ventana embebida;
+- ambos outputs generados contienen `scanCaptureTargets`, `capture-inline` y los textos del nuevo panel.

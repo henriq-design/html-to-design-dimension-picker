@@ -20,9 +20,34 @@
     <main>
       <h1>Padre con iframe srcdoc</h1>
       <iframe
+        id="srcdoc-preview"
         title="Preview srcdoc"
-        srcdoc="<main style='font-family: system-ui; padding: 24px; background: #faf5ff; min-height: 160px;'><h1>Contenido srcdoc</h1><p>Debe clasificarse segun accesibilidad real.</p></main>"
       ></iframe>
     </main>
+
+    <script>
+      document.getElementById('srcdoc-preview').setAttribute(
+        'srcdoc',
+        `<!doctype html>
+          <html lang="es">
+            <head>
+              <meta charset="utf-8" />
+              <title>Documento srcdoc</title>
+              <style>
+                body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; color: #4c1d95; background: #faf5ff; }
+                main { min-height: 150px; padding: 20px; border-radius: 18px; background: white; }
+              </style>
+            </head>
+            <body>
+              <main data-qa-content="srcdoc-inline">
+                <h1>Contenido srcdoc capturable</h1>
+                <p>Debe reconstruirse como snapshot top-level sin ejecutar de nuevo sus scripts.</p>
+                <input aria-label="Estado srcdoc" value="Estado inicial" />
+              </main>
+              <script>window.__srcdocApplicationExecuted = true;<\/script>
+            </body>
+          </html>`
+      );
+    </script>
   </body>
 </html>

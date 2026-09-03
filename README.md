@@ -21,9 +21,12 @@ Al ejecutar el marcador en una página, aparece un panel flotante con:
 - Validación básica de dimensiones.
 - Apertura de una ventana de captura cuando el tamaño elegido no coincide con el viewport actual.
 - Ajuste del tamaño real de esa ventana usando APIs del navegador como `window.open` y `resizeBy`.
+- Detección común de documentos HTML embebidos en `iframe` y `object[type="text/html"]`.
+- Captura top-level de URLs `http/https` accesibles y snapshots estáticos de `srcdoc` o `data:text/html`.
+- Fallback de apertura para documentos cross-origin con URL útil.
 - Registro de métricas de diagnóstico en consola para revisar qué tamaño ve el navegador antes de cargar `capture.js`.
 - Carga de `https://mcp.figma.com/mcp/html-to-design/capture.js` para continuar el flujo de html.to.design.
-- Estilo visual tipo **SwiftUI Liquid Glass** para el selector y para la toolbar secundaria de html.to.design, cuando esa toolbar existe en el DOM accesible.
+- Estilo visual tipo **SwiftUI Liquid Glass** para el selector, sin modificar la toolbar de html.to.design.
 
 ## Alcance técnico actual
 
@@ -91,7 +94,7 @@ Esta versión conserva esa idea base, pero añade una capa previa de producto:
 - Validación básica.
 - Apertura de ventana dimensionada.
 - Logs de diagnóstico.
-- Tratamiento más explícito de iframes y casos no capturables.
+- Tratamiento común de documentos HTML embebidos y casos no capturables.
 - Documentación de limitaciones y decisiones técnicas.
 
 La aportación no está en reemplazar el flujo original, sino en convertirlo en una herramienta más útil para análisis responsive, benchmarks y captura de referencias con un tamaño más controlado.
@@ -130,15 +133,29 @@ Si una página bloquea scripts externos por CSP, usa la versión autocontenida d
 
 ## Flujo de captura
 
-Si eliges el viewport actual, el bookmarklet lanza la captura en la pestaña activa.
+Si eliges el viewport actual, el bookmarklet lanza la captura en la pestaña activa. Si eliges otro tamaño, abre una ventana nueva con esas dimensiones y espera a que cargue.
 
-Si eliges otro tamaño, abre una ventana nueva con esas dimensiones y espera a que cargue. Antes de inyectar `capture.js`, el bookmarklet:
+Antes de inyectar `capture.js`, el bookmarklet:
 
 - Ajusta el tamaño de la ventana usando `resizeBy` cuando el navegador lo permite.
 - Registra métricas como `window.innerWidth`, `document.documentElement.clientWidth`, `document.documentElement.scrollWidth` y `window.devicePixelRatio`.
-- No sobrescribe métricas clave por defecto.
+- Mantiene desactivados por defecto los overrides de métricas (`ENABLE_CAPTURE_METRIC_OVERRIDES = false`).
+- Prepara el hash heredado de html.to.design mediante History API para evitar `hashchange` en SPAs compatibles, con fallback documentado a `location.hash`.
 - Carga `https://mcp.figma.com/mcp/html-to-design/capture.js`.
-- Aplica estilos glass a la toolbar secundaria que crea html.to.design cuando aparece.
+
+## Contenido embebido
+
+El panel agrupa los casos especiales bajo `Contenido embebido` y muestra el tipo de elemento, fuente, dimensiones, estado y acción recomendada. Los elementos visibles y accionables se priorizan; los targets de 0/1 px, ocultos o transparentes quedan en un grupo técnico plegado.
+
+Casos soportados:
+
+- `iframe` accesible con `src` `http/https`: captura de su URL en una ventana top-level dedicada.
+- `iframe` cross-origin con URL `http/https`: apertura como fallback para lanzar allí el bookmarklet manualmente.
+- `iframe srcdoc`: snapshot estático top-level, priorizando el DOM renderizado actual.
+- `object[type="text/html"]` con `data` `http/https`: captura por URL si es accesible y apertura como fallback si no lo es.
+- `object[type="text/html"]` con `data:text/html`: snapshot estático para payload percent-encoded o base64.
+
+Los snapshots inline conservan el DOM actual cuando Same-Origin Policy permite leerlo, valores de formulario, algunos canvas serializables, estilos y recursos resolubles mediante un `<base>`. Antes de abrir el snapshot se eliminan scripts, handlers inline, navegación automática, CSP declarada por meta y documentos embebidos anidados. `capture.js` solo se ejecuta en la ventana top-level reconstruida, nunca dentro del `iframe` u `object` original.
 
 ## Desarrollo
 
@@ -172,15 +189,17 @@ El selector usa una interpretación web de **SwiftUI Liquid Glass**:
 - Acción principal con azul sistema accesible.
 - Tipografía sobria y compacta.
 
-También se intenta aplicar el mismo lenguaje visual a la toolbar que monta `capture.js` (`Copy to clipboard`, `Entire screen`, `Select element`). Esta parte depende de que esa toolbar exista en el DOM accesible de la página.
+La toolbar que monta `capture.js` (`Copy to clipboard`, `Entire screen`, `Select element`) conserva su estructura y estilos originales; el bookmarklet no inspecciona ni modifica su DOM.
 
 ## Limitaciones conocidas
 
 - Algunas páginas pueden bloquear scripts externos con CSP.
-- Sitios con iframes, login, canvas o contenido muy dinámico pueden no capturarse bien.
+- Same-Origin Policy y `sandbox` impiden leer el estado actual de algunos documentos. Si existe HTML inline original se usa como fallback estático; si solo existe una URL cross-origin, se ofrece apertura manual.
+- Los snapshots no reejecutan JavaScript de la aplicación embebida. Por ello custom elements, canvas con recursos cross-origin, vídeo, estado residente solo en memoria y documentos embebidos anidados pueden perder fidelidad.
+- URLs `blob:`, `about:`, `javascript:` y objetos que no sean `text/html` no se tratan como targets capturables.
 - El ajuste de dimensiones depende de APIs del navegador como `window.open`, `resizeBy` y acceso al documento de la ventana nueva.
 - Algunos navegadores o configuraciones pueden bloquear ventanas emergentes o impedir el redimensionado exacto.
-- Si html.to.design cambia los textos o estructura de su toolbar, el override visual de esa toolbar puede dejar de aplicarse.
+- El fallback a `location.hash` puede activar routing si History API está bloqueada o parcheada por la aplicación; el camino normal usa `history.replaceState` y restaura la URL tras cargar el script.
 - Este repo no es un producto oficial de Figma ni de html.to.design; solo documenta y comparte un flujo práctico.
 
 ## Tokens: bookmarklet vs MCP

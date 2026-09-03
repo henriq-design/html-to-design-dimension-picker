@@ -1,5 +1,7 @@
 # Iframe capture audit
 
+> Documento histórico de la fase centrada en iframe. La arquitectura y el soporte vigentes están documentados en `embedded-documents-capture.md`; en particular, `srcdoc` ya dispone de snapshot top-level sanitizado.
+
 ## Casos soportados
 
 - El bookmarklet detecta iframes presentes en la página padre.

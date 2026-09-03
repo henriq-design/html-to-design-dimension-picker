@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>QA - Object data HTML percent-encoded</title>
+    <style>
+      body {
+        margin: 32px;
+        font-family: system-ui, sans-serif;
+        color: #7f1d1d;
+        background: #fff1f2;
+      }
+
+      object {
+        width: 620px;
+        height: 360px;
+        border: 3px solid #4338ca;
+        border-radius: 18px;
+        background: white;
+      }
+
+      .technical-frame {
+        position: fixed;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Página padre rosa</h1>
+      <p>Esta cabecera no debe aparecer en la captura del contenido embebido.</p>
+      <object id="percent-object" type="text/html" title="Tarjeta inline percent-encoded"></object>
+      <iframe
+        class="technical-frame"
+        title="Iframe técnico invisible"
+        srcdoc="<p>Contenido técnico</p>"
+      ></iframe>
+    </main>
+
+    <script>
+      const fixtureBaseUrl = new URL('./', window.location.href).href;
+      const inlineHtml = `<!doctype html>
+        <html lang="es">
+          <head>
+            <meta charset="utf-8" />
+            <base href="${fixtureBaseUrl}" />
+            <title>Documento inline percent-encoded</title>
+            <style>
+              body { margin: 0; padding: 36px; font-family: system-ui, sans-serif; color: #1e1b4b; background: #eef2ff; }
+              .card { display: grid; grid-template-columns: 160px 1fr; gap: 28px; align-items: center; padding: 28px; background: white; border-radius: 24px; box-shadow: 0 18px 45px rgba(67, 56, 202, .18); }
+              h1 { margin: 0 0 12px; font-size: 30px; }
+              p { margin: 0; line-height: 1.6; }
+              img { display: block; width: 160px; height: 96px; }
+            </style>
+          </head>
+          <body>
+            <article class="card" data-qa-content="percent-inline">
+              <img src="./assets/inline-card.svg" alt="Ilustración azul de confirmación" />
+              <div>
+                <h1>Documento embebido azul</h1>
+                <p>El target correcto conserva fondo, espaciado, texto y un recurso relativo.</p>
+                <input aria-label="Estado actual" value="Estado inicial" />
+              </div>
+            </article>
+            <script>window.__inlineApplicationExecuted = true;<\/script>
+          </body>
+        </html>`;
+
+      document
+        .getElementById('percent-object')
+        .setAttribute(
+          'data',
+          `data:text/html;charset=utf-8,${encodeURIComponent(inlineHtml)}`
+        );
+    </script>
+  </body>
+</html>
