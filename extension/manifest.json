@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UI COPY4",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Captura webs e iframes cross-origin para enviarlos a Figma con dimensiones controladas.",
   "permissions": ["activeTab", "scripting"],
   "background": {
