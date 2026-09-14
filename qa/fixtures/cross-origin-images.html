@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QA · imágenes cross-origin</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 48px;
+        font-family: system-ui, sans-serif;
+        background: #f3f5f8;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: repeat(3, 180px);
+        gap: 24px;
+      }
+
+      article {
+        padding: 16px;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 8px 24px rgb(24 32 48 / 10%);
+      }
+
+      img {
+        display: block;
+        width: 148px;
+        height: 190px;
+        object-fit: cover;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article><img alt="Portada 1" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 2" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 3" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 4" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 5" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 6" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 7" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 8" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 9" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 10" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 11" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+      <article><img alt="Portada 12" src="http://127.0.0.1:8081/qa/fixtures/assets/inline-card.svg" /></article>
+    </main>
+
+    <script>
+      const token = 'qa-cross-origin-images';
+      const requestEvent = `h2d:capture-request:${token}`;
+      const responseEvent = `h2d:capture-response:${token}`;
+
+      document.documentElement.setAttribute(
+        'data-h2d-extension-capture-token',
+        token
+      );
+
+      document.addEventListener(requestEvent, function (event) {
+        const canvas = document.createElement('canvas');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#e6edf7';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = '#6750a4';
+
+        document.querySelectorAll('img').forEach(function (image) {
+          const rect = image.getBoundingClientRect();
+          context.fillRect(rect.left, rect.top, rect.width, rect.height);
+        });
+
+        document.dispatchEvent(
+          new CustomEvent(responseEvent, {
+            detail: {
+              requestId: event.detail.requestId,
+              ok: true,
+              dataUrl: canvas.toDataURL('image/png'),
+              error: ''
+            }
+          })
+        );
+      });
+
+      new MutationObserver(function () {
+        const captureScript = Array.from(document.scripts).find(function (script) {
+          return script.src.includes('/capture.js');
+        });
+
+        if (!captureScript) {
+          return;
+        }
+
+        const images = Array.from(document.images);
+        document.documentElement.dataset.qaPreparedImages = String(
+          images.filter(function (image) {
+            return image.currentSrc.startsWith('data:image/png');
+          }).length
+        );
+      }).observe(document.head, { childList: true });
+    </script>
+  </body>
+</html>

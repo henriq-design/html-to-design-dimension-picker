@@ -834,6 +834,256 @@
       });
     }
 
+    function closeVisibleTabCaptureBridge() {
+      const token = getExtensionCaptureToken();
+
+      if (!token) {
+        return;
+      }
+
+      document.dispatchEvent(
+        new CustomEvent(`h2d:capture-close:${token}`)
+      );
+    }
+
+    function wait(milliseconds) {
+      return new Promise(function (resolve) {
+        window.setTimeout(resolve, milliseconds);
+      });
+    }
+
+    function blobToDataUrl(blob) {
+      return new Promise(function (resolve, reject) {
+        const reader = new FileReader();
+
+        reader.addEventListener('load', function () {
+          resolve(String(reader.result || ''));
+        });
+        reader.addEventListener('error', function () {
+          reject(new Error('No se ha podido convertir la imagen descargada.'));
+        });
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function fetchImageAsDataUrl(source) {
+      const response = await window.fetch(source, {
+        credentials: 'include',
+        cache: 'force-cache'
+      });
+
+      if (!response.ok) {
+        throw new Error(`La imagen ha respondido con ${response.status}.`);
+      }
+
+      const blob = await response.blob();
+
+      if (blob.type && !blob.type.startsWith('image/')) {
+        throw new Error('El recurso descargado no es una imagen.');
+      }
+
+      return blobToDataUrl(blob);
+    }
+
+    function getPageImageSource(image) {
+      return image.currentSrc || image.src || '';
+    }
+
+    function getPageImagesForPreparation() {
+      return Array.from(document.images).filter(function (image) {
+        if (!image.isConnected || image.closest(`#${ROOT_ID}`)) {
+          return false;
+        }
+
+        const rect = image.getBoundingClientRect();
+        const source = getPageImageSource(image);
+
+        return (
+          getTargetVisibility(image, rect) &&
+          /^https?:\/\//i.test(source)
+        );
+      });
+    }
+
+    function getImageContentRect(image) {
+      const rect = image.getBoundingClientRect();
+      const style = window.getComputedStyle(image);
+      const insetLeft =
+        parseFloat(style.borderLeftWidth || '0') +
+        parseFloat(style.paddingLeft || '0');
+      const insetRight =
+        parseFloat(style.borderRightWidth || '0') +
+        parseFloat(style.paddingRight || '0');
+      const insetTop =
+        parseFloat(style.borderTopWidth || '0') +
+        parseFloat(style.paddingTop || '0');
+      const insetBottom =
+        parseFloat(style.borderBottomWidth || '0') +
+        parseFloat(style.paddingBottom || '0');
+
+      return {
+        left: rect.left + insetLeft,
+        top: rect.top + insetTop,
+        right: rect.right - insetRight,
+        bottom: rect.bottom - insetBottom,
+        width: Math.max(1, rect.width - insetLeft - insetRight),
+        height: Math.max(1, rect.height - insetTop - insetBottom)
+      };
+    }
+
+    function isRectFullyVisible(rect) {
+      const tolerance = 1;
+
+      return (
+        rect.left >= -tolerance &&
+        rect.top >= -tolerance &&
+        rect.right <= window.innerWidth + tolerance &&
+        rect.bottom <= window.innerHeight + tolerance
+      );
+    }
+
+    async function replaceImageSource(image, dataUrl) {
+      const picture =
+        image.parentElement && image.parentElement.tagName === 'PICTURE'
+          ? image.parentElement
+          : null;
+
+      if (picture) {
+        picture.querySelectorAll('source').forEach(function (source) {
+          source.removeAttribute('srcset');
+        });
+      }
+
+      image.removeAttribute('srcset');
+      image.src = dataUrl;
+
+      if (typeof image.decode === 'function') {
+        try {
+          await image.decode();
+        } catch (error) {
+          // La captura visual sigue siendo utilizable aunque decode no esté disponible.
+        }
+      }
+    }
+
+    async function waitForImageReady(image) {
+      if (image.complete && image.naturalWidth > 0) {
+        return;
+      }
+
+      await Promise.race([
+        new Promise(function (resolve) {
+          image.addEventListener('load', resolve, { once: true });
+          image.addEventListener('error', resolve, { once: true });
+        }),
+        wait(1200)
+      ]);
+    }
+
+    async function preparePageImagesForCapture() {
+      if (!hasExtensionCaptureApi()) {
+        return { prepared: 0, rasterized: 0, unresolved: 0 };
+      }
+
+      const images = getPageImagesForPreparation();
+      const originalScroll = { x: window.scrollX, y: window.scrollY };
+      const sourceResults = new Map();
+      let prepared = 0;
+      let rasterized = 0;
+      let lastScreenshotAt = 0;
+
+      try {
+        const uniqueSources = Array.from(
+          new Set(images.map(getPageImageSource).filter(Boolean))
+        );
+
+        await Promise.all(
+          uniqueSources.map(async function (source) {
+            try {
+              sourceResults.set(source, await fetchImageAsDataUrl(source));
+            } catch (error) {
+              sourceResults.set(source, '');
+            }
+          })
+        );
+
+        for (const image of images) {
+          const dataUrl = sourceResults.get(getPageImageSource(image));
+
+          if (dataUrl) {
+            await replaceImageSource(image, dataUrl);
+            prepared += 1;
+          }
+        }
+
+        let pending = images.filter(function (image) {
+          return /^https?:\/\//i.test(getPageImageSource(image));
+        });
+
+        while (pending.length > 0) {
+          const target = pending[0];
+
+          if (!target.isConnected) {
+            pending.shift();
+            continue;
+          }
+
+          target.scrollIntoView({
+            block: 'center',
+            inline: 'center',
+            behavior: 'instant'
+          });
+          await waitForPagePaint();
+          await waitForImageReady(target);
+          await waitForPagePaint();
+
+          const visibleImages = pending.filter(function (image) {
+            return image.isConnected && isRectFullyVisible(getImageContentRect(image));
+          });
+
+          if (visibleImages.length === 0) {
+            pending.shift();
+            continue;
+          }
+
+          const elapsed = Date.now() - lastScreenshotAt;
+
+          if (elapsed < 600) {
+            await wait(600 - elapsed);
+          }
+
+          const screenshot = await requestVisibleTabCapture();
+          lastScreenshotAt = Date.now();
+
+          for (const image of visibleImages) {
+            const rect = getImageContentRect(image);
+            const crop = await cropVisibleTabCapture(screenshot, rect);
+
+            await replaceImageSource(image, crop.dataUrl);
+            rasterized += 1;
+          }
+
+          pending = pending.filter(function (image) {
+            return !visibleImages.includes(image);
+          });
+        }
+      } finally {
+        window.scrollTo({
+          left: originalScroll.x,
+          top: originalScroll.y,
+          behavior: 'instant'
+        });
+        await waitForPagePaint();
+        closeVisibleTabCaptureBridge();
+      }
+
+      return {
+        prepared: prepared,
+        rasterized: rasterized,
+        unresolved: images.length - prepared - rasterized
+      };
+    }
+
     function loadImage(source) {
       return new Promise(function (resolve, reject) {
         const image = new Image();
@@ -1651,7 +1901,7 @@
         heightInput.value = selectedPreset.height;
       }
   
-      function handleCapture() {
+      async function handleCapture() {
         const width = Number(widthInput.value);
         const height = Number(heightInput.value);
   
@@ -1676,6 +1926,23 @@
           width === window.innerWidth && height === window.innerHeight;
   
         if (shouldCaptureCurrentViewport) {
+          if (hasExtensionCaptureApi()) {
+            try {
+              const imageResult = await preparePageImagesForCapture();
+
+              console.info(
+                '[UI COPY4] Preparación de imágenes completada.',
+                imageResult
+              );
+            } catch (error) {
+              console.warn(
+                '[UI COPY4] Algunas imágenes protegidas no se han podido preparar.',
+                error
+              );
+              closeVisibleTabCaptureBridge();
+            }
+          }
+
           injectCapture(window, { width: width, height: height });
           return;
         }

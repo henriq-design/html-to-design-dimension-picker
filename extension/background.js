@@ -4,6 +4,10 @@ function installCaptureBridge(token) {
   const tokenAttribute = 'data-h2d-extension-capture-token';
   const requestEvent = `h2d:capture-request:${token}`;
   const responseEvent = `h2d:capture-response:${token}`;
+  const closeEvent = `h2d:capture-close:${token}`;
+  const maxRequests = 48;
+  let requestCount = 0;
+  let expirationTimer = null;
 
   if (typeof globalThis.__h2dCaptureBridgeCleanup === 'function') {
     globalThis.__h2dCaptureBridgeCleanup();
@@ -11,6 +15,11 @@ function installCaptureBridge(token) {
 
   function cleanup() {
     document.removeEventListener(requestEvent, handleRequest);
+    document.removeEventListener(closeEvent, cleanup);
+
+    if (expirationTimer !== null) {
+      clearTimeout(expirationTimer);
+    }
 
     if (document.documentElement.getAttribute(tokenAttribute) === token) {
       document.documentElement.removeAttribute(tokenAttribute);
@@ -39,7 +48,16 @@ function installCaptureBridge(token) {
       return;
     }
 
-    cleanup();
+    requestCount += 1;
+
+    if (requestCount > maxRequests) {
+      respond(requestId, {
+        ok: false,
+        error: 'Se ha alcanzado el límite de capturas visuales de esta sesión.'
+      });
+      cleanup();
+      return;
+    }
 
     chrome.runtime.sendMessage(
       { type: 'h2d:capture-visible-tab' },
@@ -58,7 +76,9 @@ function installCaptureBridge(token) {
 
   globalThis.__h2dCaptureBridgeCleanup = cleanup;
   document.addEventListener(requestEvent, handleRequest);
+  document.addEventListener(closeEvent, cleanup);
   document.documentElement.setAttribute(tokenAttribute, token);
+  expirationTimer = setTimeout(cleanup, 90000);
 }
 
 function showActionError(tabId, error) {

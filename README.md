@@ -25,6 +25,7 @@ Al ejecutar el marcador en una página, aparece un panel flotante con:
 - Captura top-level de URLs `http/https` accesibles y snapshots estáticos de `srcdoc` o `data:text/html`.
 - Fallback de apertura para documentos cross-origin con URL útil.
 - Extensión local opcional con captura visual de `iframe` cross-origin como una única imagen.
+- Preparación automática de imágenes protegidas o cross-origin al capturar el viewport actual desde la extensión.
 - Registro de métricas de diagnóstico en consola para revisar qué tamaño ve el navegador antes de cargar `capture.js`.
 - Carga de `https://mcp.figma.com/mcp/html-to-design/capture.js` para continuar el flujo de html.to.design.
 - Estilo visual tipo **SwiftUI Liquid Glass** para el selector, sin modificar la toolbar de html.to.design.
@@ -134,7 +135,7 @@ Si una página bloquea scripts externos por CSP, usa la versión autocontenida d
 
 ## Extensión local de Chrome
 
-La carpeta `extension` contiene una versión Manifest V3 que reutiliza el mismo selector y añade la acción **Capturar como imagen** para `iframe` cross-origin visibles. Usa únicamente los permisos `activeTab` y `scripting`; no solicita acceso permanente a todos los sitios. La captura se procesa localmente y el puente que la solicita se elimina después de un solo uso.
+La carpeta `extension` contiene una versión Manifest V3 que reutiliza el mismo selector, añade la acción **Capturar como imagen** para `iframe` cross-origin visibles y prepara las imágenes que html.to.design no puede descargar por CORS o autenticación. Usa únicamente los permisos `activeTab` y `scripting`; no solicita acceso permanente a todos los sitios. Las capturas se procesan localmente y el puente se elimina al terminar o al alcanzar su tiempo límite.
 
 Para instalarla:
 
@@ -159,6 +160,8 @@ Antes de inyectar `capture.js`, el bookmarklet:
 - Mantiene desactivados por defecto los overrides de métricas (`ENABLE_CAPTURE_METRIC_OVERRIDES = false`).
 - Prepara el hash heredado de html.to.design mediante History API para evitar `hashchange` en SPAs compatibles, con fallback documentado a `location.hash`.
 - Carga `https://mcp.figma.com/mcp/html-to-design/capture.js`.
+
+Al usar la extensión con **Viewport actual**, primero intenta incrustar cada imagen mediante una descarga autenticada. Si el servidor no permite leerla por CORS, desplaza temporalmente la página, recorta esa imagen desde la pestaña visible y vuelve a la posición inicial. La card y el resto del DOM siguen llegando como capas; solo el contenido de la imagen se rasteriza.
 
 ## Contenido embebido
 
@@ -214,6 +217,7 @@ La toolbar que monta `capture.js` (`Copy to clipboard`, `Entire screen`, `Select
 - Algunas páginas pueden bloquear scripts externos con CSP.
 - Same-Origin Policy y `sandbox` impiden leer el estado actual de algunos documentos. Si existe HTML inline original se usa como fallback estático; si solo existe una URL cross-origin, se ofrece apertura manual.
 - La captura visual de la extensión solo incluye el área del `iframe` que cabe completamente en el viewport y genera una capa de imagen, no DOM editable.
+- La recuperación visual de imágenes protegidas es automática solo con **Viewport actual**. Puede omitir imágenes mayores que el viewport, ocultas, virtualizadas o tapadas por elementos flotantes.
 - Los snapshots no reejecutan JavaScript de la aplicación embebida. Por ello custom elements, canvas con recursos cross-origin, vídeo, estado residente solo en memoria y documentos embebidos anidados pueden perder fidelidad.
 - URLs `blob:`, `about:`, `javascript:` y objetos que no sean `text/html` no se tratan como targets capturables.
 - El ajuste de dimensiones depende de APIs del navegador como `window.open`, `resizeBy` y acceso al documento de la ventana nueva.
