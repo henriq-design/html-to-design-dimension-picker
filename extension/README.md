@@ -24,9 +24,9 @@ El resultado conserva la apariencia como una única imagen. No convierte el cont
 
 ## Imágenes protegidas o cross-origin
 
-Al elegir **Viewport actual**, la extensión prepara automáticamente los elementos `img` antes de abrir la toolbar de html.to.design. Primero intenta descargarlos con la sesión actual y, si CORS lo impide, recorta sus píxeles desde la pestaña visible. Solo la imagen queda rasterizada; la card que la contiene conserva sus capas editables.
+La extensión prepara automáticamente los elementos `img` antes de abrir la toolbar de html.to.design. Primero intenta descargarlos con la sesión actual y, si CORS lo impide, recorta sus píxeles desde la pestaña visible. En presets como mobile o tablet, transfiere después esas imágenes a la nueva ventana y también las aplica si la aplicación vuelve a renderizar las cards. Solo la imagen queda rasterizada; la card que la contiene conserva sus capas editables.
 
-Durante esta preparación la página puede desplazarse unos segundos y vuelve después a su posición inicial. Las dimensiones personalizadas que abren otra ventana no disponen todavía de este fallback.
+Durante esta preparación la página original puede desplazarse unos segundos y vuelve después a su posición inicial.
 
 ## Desarrollo
 

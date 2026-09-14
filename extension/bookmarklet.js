@@ -889,6 +889,12 @@
       return image.currentSrc || image.src || '';
     }
 
+    function getPageImageSources(image) {
+      return Array.from(
+        new Set([image.currentSrc || '', image.src || ''].filter(Boolean))
+      );
+    }
+
     function getPageImagesForPreparation() {
       return Array.from(document.images).filter(function (image) {
         if (!image.isConnected || image.closest(`#${ROOT_ID}`)) {
@@ -982,15 +988,32 @@
 
     async function preparePageImagesForCapture() {
       if (!hasExtensionCaptureApi()) {
-        return { prepared: 0, rasterized: 0, unresolved: 0 };
+        return {
+          prepared: 0,
+          rasterized: 0,
+          unresolved: 0,
+          replacements: []
+        };
       }
 
       const images = getPageImagesForPreparation();
+      const sourcesByImage = new Map(
+        images.map(function (image) {
+          return [image, getPageImageSources(image)];
+        })
+      );
       const originalScroll = { x: window.scrollX, y: window.scrollY };
       const sourceResults = new Map();
+      const replacements = new Map();
       let prepared = 0;
       let rasterized = 0;
       let lastScreenshotAt = 0;
+
+      function registerReplacement(image, dataUrl) {
+        (sourcesByImage.get(image) || []).forEach(function (source) {
+          replacements.set(source, dataUrl);
+        });
+      }
 
       try {
         const uniqueSources = Array.from(
@@ -1011,6 +1034,7 @@
           const dataUrl = sourceResults.get(getPageImageSource(image));
 
           if (dataUrl) {
+            registerReplacement(image, dataUrl);
             await replaceImageSource(image, dataUrl);
             prepared += 1;
           }
@@ -1059,6 +1083,7 @@
             const rect = getImageContentRect(image);
             const crop = await cropVisibleTabCapture(screenshot, rect);
 
+            registerReplacement(image, crop.dataUrl);
             await replaceImageSource(image, crop.dataUrl);
             rasterized += 1;
           }
@@ -1080,8 +1105,54 @@
       return {
         prepared: prepared,
         rasterized: rasterized,
-        unresolved: images.length - prepared - rasterized
+        unresolved: images.length - prepared - rasterized,
+        replacements: Array.from(replacements.entries())
       };
+    }
+
+    function getImagePreparationSummary(result) {
+      return {
+        prepared: result.prepared,
+        rasterized: result.rasterized,
+        unresolved: result.unresolved,
+        replacementCount: result.replacements.length
+      };
+    }
+
+    function installPreparedImageReplacements(targetWindow, replacements) {
+      const win = targetWindow || window;
+      const doc = win.document;
+      const replacementMap = new Map(replacements || []);
+
+      if (replacementMap.size === 0 || !doc.documentElement) {
+        return null;
+      }
+
+      function applyReplacements() {
+        Array.from(doc.images).forEach(function (image) {
+          const dataUrl = getPageImageSources(image)
+            .map(function (source) {
+              return replacementMap.get(source) || '';
+            })
+            .find(Boolean);
+
+          if (dataUrl) {
+            void replaceImageSource(image, dataUrl);
+          }
+        });
+      }
+
+      const observer = new win.MutationObserver(applyReplacements);
+
+      applyReplacements();
+      observer.observe(doc.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset']
+      });
+
+      return observer;
     }
 
     function loadImage(source) {
@@ -1279,7 +1350,7 @@
       });
     }
   
-    function openSizedCapture(width, height) {
+    function openSizedCapture(width, height, imagePreparationPromise) {
       const captureWindow = window.open(
         window.location.href,
         `h2d-capture-${Date.now()}`,
@@ -1304,7 +1375,7 @@
       let attempts = 0;
       const maxAttempts = 40;
   
-      const interval = window.setInterval(function () {
+      const interval = window.setInterval(async function () {
         attempts += 1;
   
         try {
@@ -1313,6 +1384,26 @@
             captureWindow.document.readyState === 'complete'
           ) {
             window.clearInterval(interval);
+
+            if (imagePreparationPromise) {
+              try {
+                const imageResult = await imagePreparationPromise;
+
+                installPreparedImageReplacements(
+                  captureWindow,
+                  imageResult.replacements
+                );
+                console.info(
+                  '[UI COPY4] Imágenes preparadas para la vista responsive.',
+                  getImagePreparationSummary(imageResult)
+                );
+              } catch (error) {
+                console.warn(
+                  '[UI COPY4] Algunas imágenes protegidas no se han podido transferir a la vista responsive.',
+                  error
+                );
+              }
+            }
   
             captureWindow.focus();
   
@@ -1932,7 +2023,7 @@
 
               console.info(
                 '[UI COPY4] Preparación de imágenes completada.',
-                imageResult
+                getImagePreparationSummary(imageResult)
               );
             } catch (error) {
               console.warn(
@@ -1946,8 +2037,12 @@
           injectCapture(window, { width: width, height: height });
           return;
         }
-  
-        openSizedCapture(width, height);
+
+        const imagePreparationPromise = hasExtensionCaptureApi()
+          ? preparePageImagesForCapture()
+          : null;
+
+        openSizedCapture(width, height, imagePreparationPromise);
       }
 
       function getCaptureTargetFromButton(button) {
