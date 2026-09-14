@@ -59,4 +59,16 @@ History API no dispara `hashchange` ni navegación por sí misma. Si `replaceSta
 - Un `data:` opaco puede impedir leer `contentDocument`; en ese caso solo se conserva el HTML inline original.
 - Abrir una URL no garantiza conservar sesión, estado del padre, headers o permisos.
 - `blob:`, `about:`, `javascript:` y objetos que no declaren `type="text/html"` no se promueven ni decodifican.
-- El soporte fiable de contenido cross-origin no cooperativo requeriría una extensión con permisos de host y seguiría sujeto a CSP y sandbox.
+- El bookmarklet no puede leer contenido cross-origin no cooperativo.
+
+## Captura visual desde la extensión
+
+La extensión local añade un fallback rasterizado para targets cross-origin visibles:
+
+1. El selector se ejecuta en el contexto principal de la página para mantener compatible la carga de `capture.js`.
+2. Un puente aislado y de un solo uso solicita a Chrome una captura de la pestaña mediante `activeTab`.
+3. El selector coloca el target completo dentro del viewport y recorta su rectángulo teniendo en cuenta la escala real de la captura.
+4. El recorte se abre como un snapshot top-level con las dimensiones CSS originales.
+5. `capture.js` procesa ese snapshot como una única imagen.
+
+Este camino no inspecciona ni reconstruye el DOM interno del `iframe`. Está pensado para conservar con fidelidad visual widgets como reCAPTCHA, mapas, vídeos o pasarelas externas sin pedir permisos permanentes de host.

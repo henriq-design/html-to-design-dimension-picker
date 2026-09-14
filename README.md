@@ -24,6 +24,7 @@ Al ejecutar el marcador en una página, aparece un panel flotante con:
 - Detección común de documentos HTML embebidos en `iframe` y `object[type="text/html"]`.
 - Captura top-level de URLs `http/https` accesibles y snapshots estáticos de `srcdoc` o `data:text/html`.
 - Fallback de apertura para documentos cross-origin con URL útil.
+- Extensión local opcional con captura visual de `iframe` cross-origin como una única imagen.
 - Registro de métricas de diagnóstico en consola para revisar qué tamaño ve el navegador antes de cargar `capture.js`.
 - Carga de `https://mcp.figma.com/mcp/html-to-design/capture.js` para continuar el flujo de html.to.design.
 - Estilo visual tipo **SwiftUI Liquid Glass** para el selector, sin modificar la toolbar de html.to.design.
@@ -36,9 +37,8 @@ En el código fuente, `ENABLE_CAPTURE_METRIC_OVERRIDES` está desactivado (`fals
 
 La decisión es intencional: forzar métricas del navegador puede ser frágil, afectar al layout real de la página o producir resultados difíciles de depurar. El comportamiento actual es más conservador y trazable: primero intenta conseguir el tamaño deseado mediante una ventana dimensionada y después registra métricas para verificar qué está viendo realmente el navegador.
 
-## Qué no hace
+## Qué no hace el bookmarklet por sí solo
 
-- No es una extensión de Chrome.
 - No tiene permisos especiales para saltarse restricciones de navegador, CSP, iframes o sandbox.
 - No garantiza que todas las páginas se capturen exactamente con el ancho deseado.
 - No sustituye a la extensión oficial de Figma.
@@ -104,9 +104,10 @@ La aportación no está en reemplazar el flujo original, sino en convertirlo en 
 | Archivo | Para qué sirve |
 | --- | --- |
 | `src/bookmarklet.js` | Código fuente legible del bookmarklet. Aquí están la lógica del selector, la captura y los estilos. |
-| `scripts/build-bookmarklet.cjs` | Genera el bookmarklet listo para pegar en el navegador. Preserva strings, HTML y CSS para no romper los textos del modal. |
+| `scripts/build-bookmarklet.cjs` | Genera el bookmarklet listo para pegar y la copia que usa la extensión. Preserva strings, HTML y CSS para no romper los textos del modal. |
 | `marcador-codigoJS` | Código final para pegar como URL de un marcador. |
 | `dist/bookmarklet.min.js` | Mismo output generado, dentro de `dist/`. |
+| `extension/` | Extensión local de Chrome con icono propio y captura visual de `iframe` cross-origin. |
 | `original/marcador-codigoJS` | Versión original simple, conservada como referencia. |
 | `docs/decision-log.md` | Notas de decisiones del proyecto. |
 | `.cursor/skills/` y `.cursor/rules/` | Instrucciones auxiliares para asistentes/IDE que trabajan con el flujo de Figma/html.to.design. |
@@ -131,6 +132,22 @@ Si una página bloquea scripts externos por CSP, usa la versión autocontenida d
 6. Pulsa **Capturar**.
 7. Sigue la toolbar de html.to.design para copiar o enviar la captura a Figma.
 
+## Extensión local de Chrome
+
+La carpeta `extension` contiene una versión Manifest V3 que reutiliza el mismo selector y añade la acción **Capturar como imagen** para `iframe` cross-origin visibles. Usa únicamente los permisos `activeTab` y `scripting`; no solicita acceso permanente a todos los sitios. La captura se procesa localmente y el puente que la solicita se elimina después de un solo uso.
+
+Para instalarla:
+
+1. Abre `chrome://extensions`.
+2. Activa **Modo de desarrollador**.
+3. Pulsa **Cargar descomprimida**.
+4. Selecciona la carpeta `extension` del repositorio.
+5. Fija **UI COPY4** desde el menú de extensiones.
+
+También puedes abrirla con `Alt+Shift+U` o personalizar el atajo desde `chrome://extensions/shortcuts`.
+
+Cuando cambie el código, ejecuta `node scripts/build-bookmarklet.cjs` y pulsa **Actualizar** en la tarjeta de la extensión.
+
 ## Flujo de captura
 
 Si eliges el viewport actual, el bookmarklet lanza la captura en la pestaña activa. Si eliges otro tamaño, abre una ventana nueva con esas dimensiones y espera a que cargue.
@@ -151,6 +168,7 @@ Casos soportados:
 
 - `iframe` accesible con `src` `http/https`: captura de su URL en una ventana top-level dedicada.
 - `iframe` cross-origin con URL `http/https`: apertura como fallback para lanzar allí el bookmarklet manualmente.
+- `iframe` cross-origin visible desde la extensión: recorte visual de la pestaña y captura como una única imagen.
 - `iframe srcdoc`: snapshot estático top-level, priorizando el DOM renderizado actual.
 - `object[type="text/html"]` con `data` `http/https`: captura por URL si es accesible y apertura como fallback si no lo es.
 - `object[type="text/html"]` con `data:text/html`: snapshot estático para payload percent-encoded o base64.
@@ -195,6 +213,7 @@ La toolbar que monta `capture.js` (`Copy to clipboard`, `Entire screen`, `Select
 
 - Algunas páginas pueden bloquear scripts externos con CSP.
 - Same-Origin Policy y `sandbox` impiden leer el estado actual de algunos documentos. Si existe HTML inline original se usa como fallback estático; si solo existe una URL cross-origin, se ofrece apertura manual.
+- La captura visual de la extensión solo incluye el área del `iframe` que cabe completamente en el viewport y genera una capa de imagen, no DOM editable.
 - Los snapshots no reejecutan JavaScript de la aplicación embebida. Por ello custom elements, canvas con recursos cross-origin, vídeo, estado residente solo en memoria y documentos embebidos anidados pueden perder fidelidad.
 - URLs `blob:`, `about:`, `javascript:` y objetos que no sean `text/html` no se tratan como targets capturables.
 - El ajuste de dimensiones depende de APIs del navegador como `window.open`, `resizeBy` y acceso al documento de la ventana nueva.
