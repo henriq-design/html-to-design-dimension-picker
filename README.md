@@ -135,7 +135,7 @@ Si una página bloquea scripts externos por CSP, usa la versión autocontenida d
 
 ## Extensión local de Chrome
 
-La carpeta `extension` contiene una versión Manifest V3 que reutiliza el mismo selector, añade la acción **Capturar como imagen** para `iframe` cross-origin visibles y prepara las imágenes que html.to.design no puede descargar por CORS o autenticación. Usa únicamente los permisos `activeTab` y `scripting`; no solicita acceso permanente a todos los sitios. Las capturas se procesan localmente y el puente se elimina al terminar o al alcanzar su tiempo límite.
+La carpeta `extension` contiene una versión Manifest V3 que reutiliza el mismo selector, permite abrir contenido cross-origin en otra ventana o conservar su apariencia como imagen y prepara las imágenes que html.to.design no puede descargar por CORS o autenticación. Usa únicamente los permisos `activeTab` y `scripting`; no solicita acceso permanente a todos los sitios. Las capturas se procesan localmente y el puente se elimina al terminar o al alcanzar su tiempo límite.
 
 Para instalarla:
 
@@ -165,18 +165,19 @@ Al usar la extensión, primero intenta incrustar cada imagen mediante una descar
 
 ## Contenido embebido
 
-El panel agrupa los casos especiales bajo `Contenido embebido` y muestra el tipo de elemento, fuente, dimensiones, estado y acción recomendada. Los elementos visibles y accionables se priorizan; los targets de 0/1 px, ocultos o transparentes quedan en un grupo técnico plegado.
+El panel agrupa los casos especiales visibles y accionables bajo `Contenido embebido`. Los elementos de 0/1 px, ocultos, transparentes o bloqueados se omiten de la interfaz y se registran únicamente en la consola para diagnóstico.
 
 Casos soportados:
 
 - `iframe` accesible con `src` `http/https`: captura de su URL en una ventana top-level dedicada.
-- `iframe` cross-origin con URL `http/https`: apertura como fallback para lanzar allí el bookmarklet manualmente.
-- `iframe` cross-origin visible desde la extensión: recorte visual de la pestaña y captura como una única imagen.
+- `iframe` u `object` cross-origin visible con URL `http/https`: apertura en otra ventana para ejecutar allí UI COPY4, con captura visual como alternativa.
 - `iframe srcdoc`: snapshot estático top-level, priorizando el DOM renderizado actual.
 - `object[type="text/html"]` con `data` `http/https`: captura por URL si es accesible y apertura como fallback si no lo es.
 - `object[type="text/html"]` con `data:text/html`: snapshot estático para payload percent-encoded o base64.
 
 Los snapshots inline conservan el DOM actual cuando Same-Origin Policy permite leerlo, valores de formulario, algunos canvas serializables, estilos y recursos resolubles mediante un `<base>`. Antes de abrir el snapshot se eliminan scripts, handlers inline, navegación automática, CSP declarada por meta y documentos embebidos anidados. `capture.js` solo se ejecuta en la ventana top-level reconstruida, nunca dentro del `iframe` u `object` original.
+
+La extensión no se ejecuta automáticamente en la ventana cross-origin recién abierta porque mantiene permisos mínimos. Pulsa de nuevo el icono de **UI COPY4** en esa ventana. Si el recurso depende del contexto de la página original y aparece vacío, vuelve atrás y usa **Capturar apariencia como imagen**.
 
 ## Desarrollo
 

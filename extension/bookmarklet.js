@@ -1440,11 +1440,27 @@
       const shadow = host.attachShadow({ mode: 'open' });
       const captureTargets = scanCaptureTargets();
       const visibleTargets = captureTargets.filter(function (info) {
-        return info.isVisible;
+        return info.isVisible && info.recommendedAction !== 'blocked';
       });
-      const technicalTargets = captureTargets.filter(function (info) {
-        return !info.isVisible;
+      const diagnosticTargets = captureTargets.filter(function (info) {
+        return !visibleTargets.includes(info);
       });
+
+      if (diagnosticTargets.length > 0) {
+        console.info(
+          '[UI COPY4] Elementos embebidos omitidos de la interfaz.',
+          diagnosticTargets.map(function (info) {
+            return {
+              label: getCaptureTargetLabel(info),
+              kind: info.kind,
+              width: info.visualWidth,
+              height: info.visualHeight,
+              action: info.recommendedAction,
+              reason: info.reason
+            };
+          })
+        );
+      }
 
       function getCaptureTargetStatusLabel(info) {
         if (info.recommendedAction === 'capture-url') {
@@ -1456,11 +1472,7 @@
         }
 
         if (info.recommendedAction === 'open-url') {
-          if (hasExtensionCaptureApi() && info.isVisible) {
-            return 'Capturable como imagen';
-          }
-
-          return 'Abrir en nueva ventana';
+          return 'Contenido externo';
         }
 
         return 'Bloqueado';
@@ -1472,25 +1484,34 @@
           info.recommendedAction === 'capture-inline'
         ) {
           return `
-            <button class="target-action" type="button" data-target-action="capture" data-target-id="${info.id}">
-              Capturar contenido
-            </button>
+            <div class="target-actions">
+              <button class="target-action target-action-primary" type="button" data-target-action="capture" data-target-id="${info.id}">
+                Capturar HTML
+              </button>
+            </div>
           `;
         }
 
         if (info.recommendedAction === 'open-url') {
           if (hasExtensionCaptureApi() && info.isVisible) {
             return `
-              <button class="target-action" type="button" data-target-action="capture-raster" data-target-id="${info.id}">
-                Capturar como imagen
-              </button>
+              <div class="target-actions">
+                <button class="target-action target-action-primary" type="button" data-target-action="open" data-target-id="${info.id}">
+                  Abrir URL en otra ventana
+                </button>
+                <button class="target-action" type="button" data-target-action="capture-raster" data-target-id="${info.id}">
+                  Capturar apariencia como imagen
+                </button>
+              </div>
             `;
           }
 
           return `
-            <button class="target-action" type="button" data-target-action="open" data-target-id="${info.id}">
-              Abrir documento
-            </button>
+            <div class="target-actions">
+              <button class="target-action target-action-primary" type="button" data-target-action="open" data-target-id="${info.id}">
+                Abrir URL en otra ventana
+              </button>
+            </div>
           `;
         }
 
@@ -1512,10 +1533,8 @@
                 ? 'URL'
                 : 'sin fuente útil';
         const reason =
-          info.recommendedAction === 'open-url' &&
-          hasExtensionCaptureApi() &&
-          info.isVisible
-            ? 'Contenido cross-origin: la extensión conservará su apariencia como una única imagen.'
+          info.recommendedAction === 'open-url'
+            ? 'Ábrelo en otra ventana y pulsa UI COPY4 allí para capturar el HTML. Si no carga fuera de esta página, usa la captura visual.'
             : info.reason;
 
         return `
@@ -1534,7 +1553,7 @@
       }
 
       function renderCaptureTargetSection() {
-        if (!captureTargets.length) {
+        if (!visibleTargets.length) {
           return '';
         }
 
@@ -1544,18 +1563,6 @@
             <div class="target-list">
               ${visibleTargets.map(renderCaptureTargetInfo).join('')}
             </div>
-            ${
-              technicalTargets.length
-                ? `
-                  <details class="technical-targets">
-                    <summary>${technicalTargets.length} elemento${technicalTargets.length === 1 ? '' : 's'} oculto${technicalTargets.length === 1 ? '' : 's'} o técnico${technicalTargets.length === 1 ? '' : 's'}</summary>
-                    <div class="target-list target-list-technical">
-                      ${technicalTargets.map(renderCaptureTargetInfo).join('')}
-                    </div>
-                  </details>
-                `
-                : ''
-            }
           </section>
         `;
       }
@@ -1876,7 +1883,6 @@
           .target-action {
             width: 100%;
             min-height: 32px;
-            margin-top: 8px;
             padding: 6px 10px;
             color: #334155;
             background:
@@ -1889,6 +1895,20 @@
             font-weight: 650;
           }
 
+          .target-actions {
+            display: grid;
+            gap: 6px;
+            margin-top: 8px;
+          }
+
+          .target-action-primary {
+            color: #ffffff;
+            background:
+              linear-gradient(180deg, rgba(36, 145, 255, 0.96), rgba(0, 100, 230, 0.92)),
+              #006ee6;
+            border-color: rgba(255, 255, 255, 0.42);
+          }
+
           .target-action:hover {
             border-color: rgba(148, 163, 184, 0.32);
             background:
@@ -1896,21 +1916,14 @@
               rgba(255, 255, 255, 0.5);
           }
 
-          .technical-targets {
-            margin-top: 8px;
-            color: #64748b;
-            font-size: 11px;
-            line-height: 15px;
+          .target-action-primary:hover {
+            color: #ffffff;
+            background:
+              linear-gradient(180deg, rgba(63, 157, 255, 0.98), rgba(0, 91, 214, 0.94)),
+              #0067dc;
+            border-color: rgba(255, 255, 255, 0.52);
           }
 
-          .technical-targets summary {
-            cursor: pointer;
-          }
-
-          .target-list-technical {
-            margin-top: 8px;
-          }
-  
           .hint {
             position: relative;
             margin-top: 12px;
@@ -2125,13 +2138,37 @@
       }
 
       function openEmbeddedTarget(info) {
-        const openedWindow = window.open(info.url, '_blank', 'noopener,noreferrer');
+        const expectedSize = getCaptureTargetExpectedSize(info);
+        const openedWindow = window.open(
+          info.url,
+          `h2d-external-content-${Date.now()}`,
+          [
+            `width=${expectedSize.width}`,
+            `height=${expectedSize.height}`,
+            'left=0',
+            'top=0',
+            'resizable=yes',
+            'scrollbars=yes'
+          ].join(',')
+        );
 
         if (!openedWindow) {
           window.alert(
             'El navegador ha bloqueado la nueva ventana. Abre manualmente la URL del documento si está disponible.'
           );
+          return;
         }
+
+        try {
+          openedWindow.opener = null;
+        } catch (error) {
+          console.warn(
+            '[UI COPY4] No se ha podido aislar la ventana externa de su origen.',
+            error
+          );
+        }
+
+        closePanel();
       }
 
       function handleCaptureTargetAction(event) {
