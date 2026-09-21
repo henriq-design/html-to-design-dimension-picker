@@ -26,7 +26,7 @@ El resultado conserva la apariencia como una única imagen. No convierte el cont
 
 Cuando un `iframe` u `object` visible tiene una URL externa, el panel ofrece dos caminos:
 
-- **Abrir URL en otra ventana**: acción principal para cargar el documento fuera del contenedor. Pulsa de nuevo **UI COPY4** en esa ventana para capturar el HTML.
+- **Abrir URL en nueva pestaña**: acción secundaria para cargar el documento fuera del contenedor. La pestaña conserva la barra normal de Chrome; pulsa allí **UI COPY4** para capturar el HTML.
 - **Capturar apariencia como imagen**: alternativa para widgets que no funcionan fuera de la página original, como reCAPTCHA.
 
 Los iframes ocultos, de 0 × 0 o sin una acción útil no aparecen en el panel. La extensión conserva un resumen en la consola para diagnóstico.

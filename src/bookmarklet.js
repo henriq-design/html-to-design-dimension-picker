@@ -1485,8 +1485,8 @@
         ) {
           return `
             <div class="target-actions">
-              <button class="target-action target-action-primary" type="button" data-target-action="capture" data-target-id="${info.id}">
-                Capturar HTML
+              <button class="target-action" type="button" data-target-action="capture" data-target-id="${info.id}">
+                Capturar solo este HTML
               </button>
             </div>
           `;
@@ -1496,10 +1496,10 @@
           if (hasExtensionCaptureApi() && info.isVisible) {
             return `
               <div class="target-actions">
-                <button class="target-action target-action-primary" type="button" data-target-action="open" data-target-id="${info.id}">
-                  Abrir URL en otra ventana
+                <button class="target-action" type="button" data-target-action="open" data-target-id="${info.id}">
+                  Abrir URL en nueva pestaña
                 </button>
-                <button class="target-action" type="button" data-target-action="capture-raster" data-target-id="${info.id}">
+                <button class="target-action target-action-tertiary" type="button" data-target-action="capture-raster" data-target-id="${info.id}">
                   Capturar apariencia como imagen
                 </button>
               </div>
@@ -1508,8 +1508,8 @@
 
           return `
             <div class="target-actions">
-              <button class="target-action target-action-primary" type="button" data-target-action="open" data-target-id="${info.id}">
-                Abrir URL en otra ventana
+              <button class="target-action" type="button" data-target-action="open" data-target-id="${info.id}">
+                Abrir URL en nueva pestaña
               </button>
             </div>
           `;
@@ -1534,7 +1534,7 @@
                 : 'sin fuente útil';
         const reason =
           info.recommendedAction === 'open-url'
-            ? 'Ábrelo en otra ventana y pulsa UI COPY4 allí para capturar el HTML. Si no carga fuera de esta página, usa la captura visual.'
+            ? 'Ábrelo en una pestaña nueva y pulsa UI COPY4 allí para capturar el HTML. Si no carga fuera de esta página, usa la captura visual.'
             : info.reason;
 
         return `
@@ -1601,7 +1601,9 @@
             backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
             -webkit-backdrop-filter: blur(24px) saturate(180%) brightness(1.04);
             isolation: isolate;
-            overflow: hidden;
+            max-height: calc(100vh - 32px);
+            overflow-x: hidden;
+            overflow-y: auto;
           }
 
           .panel::before {
@@ -1780,23 +1782,6 @@
               #006ee6;
           }
   
-          .button-secondary {
-            color: #334155;
-            background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.5)),
-              rgba(255, 255, 255, 0.44);
-            box-shadow:
-              inset 0 1px 0 rgba(255, 255, 255, 0.84),
-              0 8px 20px rgba(15, 23, 42, 0.06);
-          }
-
-          .button-secondary:hover {
-            border-color: rgba(148, 163, 184, 0.32);
-            background:
-              linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.56)),
-              rgba(255, 255, 255, 0.5);
-          }
-  
           .button-icon {
             width: 34px;
             height: 34px;
@@ -1827,21 +1812,28 @@
 
           .target-section {
             position: relative;
+            width: 100%;
+            min-width: 0;
             margin-top: 16px;
             padding-top: 12px;
+            box-sizing: border-box;
             border-top: 1px solid rgba(148, 163, 184, 0.22);
           }
 
           .target-list {
             display: grid;
+            width: 100%;
+            min-width: 0;
             gap: 8px;
-            max-height: 178px;
-            overflow: auto;
-            padding-right: 2px;
+            padding: 0;
+            box-sizing: border-box;
           }
 
           .target-item {
+            width: 100%;
+            min-width: 0;
             padding: 10px;
+            box-sizing: border-box;
             color: #334155;
             background: rgba(255, 255, 255, 0.38);
             border: 1px solid rgba(148, 163, 184, 0.2);
@@ -1852,6 +1844,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
             gap: 8px;
             color: #0f172a;
             font-size: 12px;
@@ -1878,6 +1871,7 @@
             color: #64748b;
             font-size: 11px;
             line-height: 15px;
+            overflow-wrap: anywhere;
           }
 
           .target-action {
@@ -1897,16 +1891,11 @@
 
           .target-actions {
             display: grid;
+            width: 100%;
+            min-width: 0;
             gap: 6px;
             margin-top: 8px;
-          }
-
-          .target-action-primary {
-            color: #ffffff;
-            background:
-              linear-gradient(180deg, rgba(36, 145, 255, 0.96), rgba(0, 100, 230, 0.92)),
-              #006ee6;
-            border-color: rgba(255, 255, 255, 0.42);
+            box-sizing: border-box;
           }
 
           .target-action:hover {
@@ -1916,12 +1905,18 @@
               rgba(255, 255, 255, 0.5);
           }
 
-          .target-action-primary:hover {
-            color: #ffffff;
-            background:
-              linear-gradient(180deg, rgba(63, 157, 255, 0.98), rgba(0, 91, 214, 0.94)),
-              #0067dc;
-            border-color: rgba(255, 255, 255, 0.52);
+          .target-action-tertiary {
+            min-height: 28px;
+            color: #475569;
+            background: transparent;
+            border-color: transparent;
+            box-shadow: none;
+          }
+
+          .target-action-tertiary:hover {
+            color: #334155;
+            background: rgba(255, 255, 255, 0.38);
+            border-color: transparent;
           }
 
           .hint {
@@ -1967,10 +1962,6 @@
           </div>
   
           <div class="actions">
-            <button class="button button-secondary" type="button" data-action="close">
-              Cancelar
-            </button>
-  
             <button class="button button-primary" type="button" data-action="capture">
               Capturar
             </button>
@@ -2138,23 +2129,11 @@
       }
 
       function openEmbeddedTarget(info) {
-        const expectedSize = getCaptureTargetExpectedSize(info);
-        const openedWindow = window.open(
-          info.url,
-          `h2d-external-content-${Date.now()}`,
-          [
-            `width=${expectedSize.width}`,
-            `height=${expectedSize.height}`,
-            'left=0',
-            'top=0',
-            'resizable=yes',
-            'scrollbars=yes'
-          ].join(',')
-        );
+        const openedWindow = window.open(info.url, '_blank');
 
         if (!openedWindow) {
           window.alert(
-            'El navegador ha bloqueado la nueva ventana. Abre manualmente la URL del documento si está disponible.'
+            'El navegador ha bloqueado la nueva pestaña. Abre manualmente la URL del documento si está disponible.'
           );
           return;
         }
@@ -2163,7 +2142,7 @@
           openedWindow.opener = null;
         } catch (error) {
           console.warn(
-            '[UI COPY4] No se ha podido aislar la ventana externa de su origen.',
+            '[UI COPY4] No se ha podido aislar la pestaña externa de su origen.',
             error
           );
         }
